@@ -77,16 +77,49 @@ Accede a la vista ejecutiva en [http://localhost:3000/ejecutivo](http://localhos
 ## Estado del Desarrollo
 - ✅ Configuración inicial del proyecto
 - ✅ Estructura base de la aplicación
-- 🔄 Implementación de la vista de monitoreo técnico
+- ✅ Implementación de la vista ejecutiva (HU-01)
+  - Creación de dashboard con información general sobre consumo y saturación por plaza
+  - Visualización de tendencias de crecimiento histórico
+  - Identificación visual de plazas críticas 
+- ✅ Implementación de la vista de monitoreo técnico (HU-02)
+  - Consulta detallada por plaza y sitio individual
+  - Visualización de capacidad y consumo actual por enlace
+  - Histórico de utilización para análisis de tendencias
 - 🔄 Integración con APIs de PRTG y Observium
-- 🔜 Desarrollo de la vista ejecutiva
-- 🔜 Sistema de alertas
-- 🔜 Clasificación automática de sitios críticos
-- 🔜 Generación de reportes
+- 🔜 Sistema de alertas por umbral de capacidad (HU-03)
+- 🔜 Clasificación automática de sitios críticos (HU-04)
+- 🔜 Acceso a información en dos capas (HU-05)
+- 🔜 Consumo de datos desde fuentes externas (HU-06)
+- 🔜 Reportes automáticos (HU-07)
+- 🔜 Propuesta de nuevos indicadores (HU-08)
+
+## Historias de Usuario Implementadas
+
+### HU-01: Visualización Ejecutiva del Estado de la Red
+**Descripción:**
+Como director del área técnica o ejecutiva, quiero visualizar un dashboard resumido con información general sobre el consumo, saturaciones, crecimiento y fallas críticas de la red, para tomar decisiones estratégicas informadas.
+
+**Implementación:**
+- Dashboard principal con visualización global de la red
+- Gráficos de consumo total por plaza
+- Indicadores visuales para plazas con saturación crítica
+- Tendencias de crecimiento con análisis temporal
+- Listado de sitios críticos por saturación y fallas
+
+### HU-02: Monitoreo Técnico Detallado
+**Descripción:**
+Como ingeniero o técnico de soporte, quiero consultar información detallada por plaza o nodo específico, para diagnosticar saturaciones, problemas técnicos y planear mejoras técnicas específicas.
+
+**Implementación:**
+- Vista detallada con filtrado por plaza y sitio individual
+- Tablas de capacidad y consumo actual por enlace
+- Indicadores de umbrales de saturación
+- Gráficos de utilización histórica para análisis de tendencias
+- Detalle técnico de enlaces con información de latencia y estado
 
 ## Próximos Pasos
-1. Completar la implementación de la vista de monitoreo técnico
-2. Desarrollar la vista ejecutiva
+1. Implementar el sistema de alertas por umbral de capacidad (HU-03)
+2. Desarrollar la clasificación automática de sitios críticos (HU-04)
 3. Implementar el sistema de autenticación y roles
 4. Integrar completamente las APIs de PRTG y Observium
 5. Desarrollar el módulo de alertas
