@@ -6,7 +6,8 @@ import React from 'react'
 export default function page() {
 
     async function test(){
-       const {data} = await observiumApi("/alerts/?status=failed")
+       const {data} = await observiumApi("/devices")
+   
 
        console.log(data)
     }

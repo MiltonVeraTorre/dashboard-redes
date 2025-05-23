@@ -1,11 +1,14 @@
 'use client';
 
 import React from 'react';
-import { NetworkOverview, Plaza } from '@/lib/domain/entities';
+import { NetworkOverview } from '@/lib/domain/entities';
 import { OverviewCard } from './OverviewCard';
 import { PlazaUtilizationChart } from './PlazaUtilizationChart';
 import { AlertsList } from './AlertsList';
 import { CriticalSitesList } from './CriticalSitesList';
+import { NetworkConsumptionChart } from './NetworkConsumptionChart';
+import { CapacityUtilizationChart } from './CapacityUtilizationChart';
+import { GrowthTrendsChart } from './GrowthTrendsChart';
 
 interface ExecutiveDashboardProps {
   overview: NetworkOverview;
@@ -68,8 +71,8 @@ export function ExecutiveDashboard({ overview }: ExecutiveDashboardProps) {
         />
       </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Main Content - First Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         {/* Utilization by Plaza */}
         <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Utilization by Plaza</h2>
@@ -81,12 +84,33 @@ export function ExecutiveDashboard({ overview }: ExecutiveDashboardProps) {
           <h2 className="text-xl font-semibold mb-4">Recent Alerts</h2>
           <AlertsList alerts={recentAlerts} />
         </div>
+      </div>
 
-        {/* Critical Sites */}
-        <div className="lg:col-span-3 bg-white rounded-lg shadow p-6 mt-8">
-          <h2 className="text-xl font-semibold mb-4">Critical Sites</h2>
-          <CriticalSitesList />
+      {/* Main Content - Second Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        {/* Network Consumption by Plaza */}
+        <div className="lg:col-span-1 bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Consumo de Red por Plaza</h2>
+          <NetworkConsumptionChart />
         </div>
+
+        {/* Capacity Utilization */}
+        <div className="lg:col-span-1 bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Capacidad Utilizada</h2>
+          <CapacityUtilizationChart />
+        </div>
+
+        {/* Growth Trends */}
+        <div className="lg:col-span-1 bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Tendencias de Crecimiento</h2>
+          <GrowthTrendsChart />
+        </div>
+      </div>
+
+      {/* Critical Sites */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-semibold mb-4">Sitios Críticos</h2>
+        <CriticalSitesList />
       </div>
     </div>
   );
