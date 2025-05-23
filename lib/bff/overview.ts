@@ -6,7 +6,7 @@
  */
 
 import { NetworkOverview } from '../domain/entities';
-import * as OverviewDomain from '../domain/overview';
+import * as OverviewDomain from '../bff/overview';
 
 /**
  * Get a comprehensive overview of the network status
