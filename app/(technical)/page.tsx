@@ -3,7 +3,7 @@
 // Using React hooks
 import { useEffect, useState } from 'react';
 import { Site, Link } from '@/lib/domain/entities';
-import { http } from '@/lib/utils/http';
+import { TechnicalService } from '@/lib/services/technicalService';
 import { TechnicalDashboard } from '@/app/_components/TechnicalDashboard';
 
 export default function TechnicalPage() {
@@ -18,7 +18,7 @@ export default function TechnicalPage() {
     async function fetchSites() {
       try {
         setLoading(true);
-        const data = await http.get<Site[]>('/api/sites');
+        const data = await TechnicalService.getAllSites();
         setSites(data);
 
         // Select the first site by default if none is selected
@@ -45,7 +45,7 @@ export default function TechnicalPage() {
     async function fetchSiteDetails() {
       try {
         setLoading(true);
-        const data = await http.get<{ site: Site; links: Link[] }>(`/api/sites/${selectedSite}`);
+        const data = await TechnicalService.getSiteDetails(selectedSite);
         setSiteDetails(data);
         setError(null);
       } catch (err) {

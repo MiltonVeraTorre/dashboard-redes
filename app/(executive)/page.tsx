@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { NetworkOverview } from '@/lib/domain/entities';
-import { http } from '@/lib/utils/http';
+import { ExecutiveService } from '@/lib/services/executiveService';
 import { ExecutiveDashboard } from '@/app/_components/ExecutiveDashboard';
 
 export default function ExecutivePage() {
@@ -14,7 +14,7 @@ export default function ExecutivePage() {
     async function fetchData() {
       try {
         setLoading(true);
-        const data = await http.get<NetworkOverview>('/api/overview');
+        const data = await ExecutiveService.getNetworkOverview();
         setOverview(data);
         setError(null);
       } catch (err) {

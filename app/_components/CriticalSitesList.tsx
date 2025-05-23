@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { http } from '@/lib/utils/http';
+import { RankingService } from '@/lib/services/rankingService';
 
 interface RankedSite {
   id: string;
@@ -16,12 +16,12 @@ export function CriticalSitesList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sites, setSites] = useState<RankedSite[]>([]);
-  
+
   useEffect(() => {
     async function fetchCriticalSites() {
       try {
         setLoading(true);
-        const data = await http.get<RankedSite[]>('/api/ranking?by=critical&limit=5');
+        const data = await RankingService.getCriticalSites(5);
         setSites(data);
         setError(null);
       } catch (err) {
@@ -31,10 +31,10 @@ export function CriticalSitesList() {
         setLoading(false);
       }
     }
-    
+
     fetchCriticalSites();
   }, []);
-  
+
   if (loading) {
     return (
       <div className="flex justify-center py-8">
@@ -42,7 +42,7 @@ export function CriticalSitesList() {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -50,7 +50,7 @@ export function CriticalSitesList() {
       </div>
     );
   }
-  
+
   if (sites.length === 0) {
     return (
       <div className="text-center py-8">
@@ -58,7 +58,7 @@ export function CriticalSitesList() {
       </div>
     );
   }
-  
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
