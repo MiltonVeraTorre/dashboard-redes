@@ -1,69 +1,71 @@
 'use client';
 
-// Using React hooks
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import { Site, Link } from '@/lib/domain/entities';
-import { TechnicalService } from '@/lib/services/technicalService';
 import { TechnicalDashboard } from '@/app/_components/TechnicalDashboard';
+import { fetchAllSites, fetchSiteDetails } from '@/lib/services/technical-service';
+import { useSearchParams } from 'next/navigation';
 
+/**
+ * Technical Dashboard Page
+ *
+ * This page displays detailed technical information about network sites and links.
+ */
 export default function TechnicalPage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSite, setSelectedSite] = useState<string | null>(null);
-  const [siteDetails, setSiteDetails] = useState<{ site: Site; links: Link[] } | null>(null);
+  const searchParams = useSearchParams();
+  const siteParam = searchParams.get('site');
 
-  // Fetch all sites
-  useEffect(() => {
-    async function fetchSites() {
-      try {
-        setLoading(true);
-        const data = await TechnicalService.getAllSites();
-        setSites(data);
+  const [selectedSite, setSelectedSite] = useState<string | null>(siteParam);
 
-        // Select the first site by default if none is selected
-        if (data.length > 0 && !selectedSite) {
-          setSelectedSite(data[0].id);
-        }
-
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching sites:', err);
-        setError('Failed to load sites. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
+  // Fetch all sites using SWR
+  const {
+    data: sites = [],
+    error: sitesError,
+    isLoading: sitesLoading
+  } = useSWR<Site[]>(
+    'allSites',
+    fetchAllSites,
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      refreshInterval: 60000, // Refresh every minute
     }
+  );
 
-    fetchSites();
-  }, []);
-
-  // Fetch details for the selected site
+  // Set default selected site if none is selected
   useEffect(() => {
-    if (!selectedSite) return;
-
-    async function fetchSiteDetails() {
-      try {
-        setLoading(true);
-        const data = await TechnicalService.getSiteDetails(selectedSite);
-        setSiteDetails(data);
-        setError(null);
-      } catch (err) {
-        console.error(`Error fetching details for site ${selectedSite}:`, err);
-        setError('Failed to load site details. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
+    if (sites.length > 0 && !selectedSite) {
+      setSelectedSite(sites[0].id);
     }
+  }, [sites, selectedSite]);
 
-    fetchSiteDetails();
-  }, [selectedSite]);
+  // Fetch details for the selected site using SWR
+  const {
+    data: siteDetails,
+    error: detailsError,
+    isLoading: detailsLoading
+  } = useSWR<{ site: Site; links: Link[] }>(
+    selectedSite ? `siteDetails-${selectedSite}` : null,
+    () => selectedSite ? fetchSiteDetails(selectedSite) : null,
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      refreshInterval: 30000, // Refresh every 30 seconds
+    }
+  );
 
   const handleSiteChange = (siteId: string) => {
     setSelectedSite(siteId);
   };
 
-  if (loading && sites.length === 0) {
+  // Combine loading states
+  const isLoading = sitesLoading || (detailsLoading && selectedSite);
+
+  // Combine error states
+  const error = sitesError || detailsError;
+
+  if (sitesLoading && sites.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -93,7 +95,7 @@ export default function TechnicalPage() {
             ></path>
           </svg>
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Error</h2>
-          <p className="text-gray-600">{error}</p>
+          <p className="text-gray-600">{error.message || 'An error occurred while loading the dashboard.'}</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
@@ -111,8 +113,8 @@ export default function TechnicalPage() {
       selectedSite={selectedSite}
       siteDetails={siteDetails}
       onSiteChange={handleSiteChange}
-      loading={loading}
-      error={error}
+      loading={isLoading}
+      error={error ? error.message : null}
     />
   );
 }

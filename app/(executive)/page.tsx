@@ -1,39 +1,34 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import useSWR from 'swr';
 import { NetworkOverview } from '@/lib/domain/entities';
-import { ExecutiveService } from '@/lib/services/executiveService';
 import { ExecutiveDashboard } from '@/app/_components/ExecutiveDashboard';
+import { fetchNetworkOverview } from '@/lib/services/network-service';
 
+/**
+ * Executive Dashboard Page
+ *
+ * This page displays an overview of the network status for executives.
+ */
 export default function ExecutivePage() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [overview, setOverview] = useState<NetworkOverview | null>(null);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        const data = await ExecutiveService.getNetworkOverview();
-        setOverview(data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching overview data:', err);
-        setError('Failed to load network overview data. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
+  // Use SWR for data fetching with automatic revalidation
+  const { data: overview, error, isLoading, isValidating, mutate } = useSWR<NetworkOverview>(
+    'networkOverview',
+    fetchNetworkOverview,
+    {
+      refreshInterval: 60000, // Refresh every minute
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      errorRetryCount: 3, // Retry 3 times on error
+      errorRetryInterval: 5000, // Wait 5 seconds between retries
+      dedupingInterval: 5000, // Deduplicate requests within 5 seconds
+      focusThrottleInterval: 10000, // Throttle revalidation on focus
     }
+  );
 
-    fetchData();
-
-    // Set up polling for real-time updates
-    const intervalId = setInterval(fetchData, 60000); // Refresh every minute
-
-    return () => clearInterval(intervalId);
-  }, []);
-
-  if (loading) {
+  // Loading state
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -44,6 +39,7 @@ export default function ExecutivePage() {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -63,9 +59,9 @@ export default function ExecutivePage() {
             ></path>
           </svg>
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Error</h2>
-          <p className="text-gray-600">{error}</p>
+          <p className="text-gray-600">{error.message || 'Failed to load network overview data.'}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => mutate()} // Use SWR's mutate to retry
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
             Retry
@@ -75,5 +71,21 @@ export default function ExecutivePage() {
     );
   }
 
-  return <ExecutiveDashboard overview={overview!} />;
+  // Show a subtle loading indicator when revalidating in the background
+  const revalidatingIndicator = isValidating && !isLoading && (
+    <div className="fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg">
+      <div className="flex items-center">
+        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+        <span>Refreshing data...</span>
+      </div>
+    </div>
+  );
+
+  // Render the dashboard with the data
+  return (
+    <>
+      {overview && <ExecutiveDashboard overview={overview} />}
+      {revalidatingIndicator}
+    </>
+  );
 }
