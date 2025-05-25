@@ -25,10 +25,10 @@ import type { Site, Link, Alert } from '../domain/entities';
  * - OBSERVIUM_PASSWORD: Basic auth password
  */
 export const observiumApi: AxiosInstance = axios.create({
-  baseURL: process.env.OBSERVIUM_BASE_URL || 'http://201.150.5.213/api/v0',
+  baseURL: process.env.OBSERVIUM_BASE_URL!,
   auth: {
-    username: process.env.OBSERVIUM_USERNAME || 'equipo2',
-    password: process.env.OBSERVIUM_PASSWORD || '91Rert@mU'
+    username: process.env.OBSERVIUM_USERNAME!,
+    password: process.env.OBSERVIUM_PASSWORD!
   },
   headers: {
     'Content-Type': 'application/json',

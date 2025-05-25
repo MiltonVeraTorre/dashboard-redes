@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
   const response = {
     status: overallStatus,
     observium: {
-      baseURL: process.env.OBSERVIUM_BASE_URL || 'http://201.150.5.213/api/v0',
+      baseURL: process.env.OBSERVIUM_BASE_URL,
       connected: tests[0].status === 'pass',
       responseTime: tests[0].duration || null
     },

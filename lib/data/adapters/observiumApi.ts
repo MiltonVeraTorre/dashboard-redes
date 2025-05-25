@@ -1,6 +1,6 @@
 /**
  * Observium API Client Adapter
- * 
+ *
  * This file sets up a specialized API client for Observium with authentication
  * for making network requests to the Observium service.
  */
@@ -8,9 +8,9 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_OBSERVIUM_API_BASE_URL || 'http://172.26.2.161/';
-const API_USERNAME = process.env.NEXT_PUBLIC_API_USERNAME || 'equipo2';
-const API_PASSWORD = process.env.NEXT_PUBLIC_API_PASSWORD || '91Rert@mU';
+const API_BASE_URL = process.env.NEXT_PUBLIC_OBSERVIUM_API_BASE_URL!;
+const API_USERNAME = process.env.NEXT_PUBLIC_API_USERNAME!;
+const API_PASSWORD = process.env.NEXT_PUBLIC_API_PASSWORD!;
 
 // Create a base64 encoded string for Basic Authentication
 const basicAuthToken = Buffer.from(`${API_USERNAME}:${API_PASSWORD}`).toString('base64');
