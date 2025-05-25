@@ -420,7 +420,15 @@ export async function fetchMemPools(filters: MemPoolFilters = {}): Promise<Obser
     if (filters.fields) params.fields = filters.fields;
 
     const response = await observiumApi.get('/mempools', { params });
-    return response.data || [];
+
+    // Handle different response formats from Observium API
+    if (response.data && response.data.mempools) {
+      return Object.values(response.data.mempools) as ObserviumMemPool[];
+    } else if (Array.isArray(response.data)) {
+      return response.data as ObserviumMemPool[];
+    }
+
+    return [];
   } catch (error) {
     console.error('Error fetching memory pools from Observium:', error);
     throw new Error(`Failed to fetch memory pools: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -449,7 +457,15 @@ export async function fetchProcessors(filters: ProcessorFilters = {}): Promise<O
     if (filters.fields) params.fields = filters.fields;
 
     const response = await observiumApi.get('/processors', { params });
-    return response.data || [];
+
+    // Handle different response formats from Observium API
+    if (response.data && response.data.processors) {
+      return Object.values(response.data.processors) as ObserviumProcessor[];
+    } else if (Array.isArray(response.data)) {
+      return response.data as ObserviumProcessor[];
+    }
+
+    return [];
   } catch (error) {
     console.error('Error fetching processors from Observium:', error);
     throw new Error(`Failed to fetch processors: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -481,7 +497,15 @@ export async function fetchSensors(filters: SensorFilters = {}): Promise<Observi
     if (filters.fields) params.fields = filters.fields;
 
     const response = await observiumApi.get('/sensors', { params });
-    return response.data || [];
+
+    // Handle different response formats from Observium API
+    if (response.data && response.data.sensors) {
+      return Object.values(response.data.sensors) as ObserviumSensor[];
+    } else if (Array.isArray(response.data)) {
+      return response.data as ObserviumSensor[];
+    }
+
+    return [];
   } catch (error) {
     console.error('Error fetching sensors from Observium:', error);
     throw new Error(`Failed to fetch sensors: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -510,7 +534,15 @@ export async function fetchNeighbours(filters: NeighbourFilters = {}): Promise<O
     if (filters.fields) params.fields = filters.fields;
 
     const response = await observiumApi.get('/neighbours', { params });
-    return response.data || [];
+
+    // Handle different response formats from Observium API
+    if (response.data && response.data.neighbours) {
+      return Object.values(response.data.neighbours) as ObserviumNeighbour[];
+    } else if (Array.isArray(response.data)) {
+      return response.data as ObserviumNeighbour[];
+    }
+
+    return [];
   } catch (error) {
     console.error('Error fetching neighbours from Observium:', error);
     throw new Error(`Failed to fetch neighbours: ${error instanceof Error ? error.message : 'Unknown error'}`);
