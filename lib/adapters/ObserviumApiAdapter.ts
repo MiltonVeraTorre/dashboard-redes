@@ -19,14 +19,16 @@ import type { Site, Link, Alert } from '../domain/entities';
 /**
  * Create a dedicated axios instance for Observium API
  *
- * Base URL: http://201.150.5.213/api/v0
- * Authentication: Basic Auth (equipo2 / 91Rert@mU)
+ * Uses environment variables for configuration:
+ * - OBSERVIUM_BASE_URL: API base URL
+ * - OBSERVIUM_USERNAME: Basic auth username
+ * - OBSERVIUM_PASSWORD: Basic auth password
  */
 export const observiumApi: AxiosInstance = axios.create({
-  baseURL: 'http://201.150.5.213/api/v0',
-   auth: {
-    username: 'equipo2',
-    password: '91Rert@mU'
+  baseURL: process.env.OBSERVIUM_BASE_URL || 'http://201.150.5.213/api/v0',
+  auth: {
+    username: process.env.OBSERVIUM_USERNAME || 'equipo2',
+    password: process.env.OBSERVIUM_PASSWORD || '91Rert@mU'
   },
   headers: {
     'Content-Type': 'application/json',
@@ -344,7 +346,17 @@ export async function fetchCounters(filters: CounterFilters = {}): Promise<Obser
     if (filters.fields) params.fields = filters.fields;
 
     const response = await observiumApi.get('/counters', { params });
-    return response.data || [];
+
+    // Handle different response formats from Observium API
+    if (response.data && response.data.counters) {
+      // Format: { count: N, status: "ok", counters: { "1": {...}, "2": {...} } }
+      return Object.values(response.data.counters) as ObserviumCounter[];
+    } else if (Array.isArray(response.data)) {
+      // Format: [ {...}, {...}, ... ]
+      return response.data as ObserviumCounter[];
+    }
+
+    return [];
   } catch (error) {
     console.error('Error fetching counters from Observium:', error);
     throw new Error(`Failed to fetch counters: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -898,6 +910,22 @@ export async function fetchHistoricalPerformance(
       to: toDate,
       fields: 'counter_id,device_id,port_id,counter_name,counter_value,timestamp,rate'
     });
+
+    // Ensure counters is an array before processing
+    if (!Array.isArray(counters)) {
+      console.warn('Counters data is not an array, returning empty historical data');
+      return {
+        interval,
+        fromDate,
+        toDate,
+        data: {},
+        summary: {
+          totalDataPoints: 0,
+          devicesCount: 0,
+          portsCount: 0
+        }
+      };
+    }
 
     // Group counters by device and port for easier processing
     const groupedData = counters.reduce((acc, counter) => {
