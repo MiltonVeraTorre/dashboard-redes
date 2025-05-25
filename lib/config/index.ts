@@ -8,8 +8,9 @@ export const config = {
     password: process.env.PRTG_PASSWORD || 'demo',
   },
   observium: {
-    baseUrl: process.env.OBSERVIUM_BASE_URL || 'https://observium.example.com',
-    token: process.env.OBSERVIUM_TOKEN || 'demo-token',
+    baseUrl: process.env.OBSERVIUM_BASE_URL || 'http://201.150.5.213/api/v0',
+    username: process.env.OBSERVIUM_USERNAME || 'equipo2',
+    password: process.env.OBSERVIUM_PASSWORD || '91Rert@mU',
   },
   // Application settings
   refreshInterval: parseInt(process.env.REFRESH_INTERVAL || '300000', 10), // 5 minutes
