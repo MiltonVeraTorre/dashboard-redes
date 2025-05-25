@@ -34,7 +34,7 @@ export const observiumApi: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  timeout: 10000, // 10 seconds timeout
+  timeout: 30000, // 30 seconds timeout (increased for multiple API calls)
   maxRedirects: 5, // Limit redirects to prevent infinite loops
   validateStatus: (status) => {
     return status >= 200 && status < 300; // Only consider 2xx responses as successful
@@ -272,43 +272,53 @@ export async function fetchDevices(filters: DeviceFilters = {}): Promise<Observi
 /**
  * Fetch network ports/interfaces from Observium API
  * Essential for link capacity and usage monitoring
+ *
+ * Based on official API documentation:
+ * - Parameters: device_id, ifType, state, errors, hostname
+ * - Multiple device_ids not supported - use individual calls
  */
 export async function fetchPorts(filters: PortFilters = {}): Promise<ObserviumPort[]> {
   try {
+    // If multiple device_ids provided, make individual calls
+    if (Array.isArray(filters.device_id) && filters.device_id.length > 1) {
+      console.log(`📡 Making individual port calls for ${filters.device_id.length} devices`);
+      const portPromises = filters.device_id.map(deviceId =>
+        fetchPorts({ ...filters, device_id: deviceId })
+      );
+      const portArrays = await Promise.all(portPromises);
+      return portArrays.flat();
+    }
+
     const params: Record<string, any> = {};
 
-    // Handle device_id filter (single or array)
+    // Handle single device_id (API doesn't support multiple)
     if (filters.device_id !== undefined) {
       if (Array.isArray(filters.device_id)) {
-        params.device_id = filters.device_id.join(',');
+        params.device_id = filters.device_id[0]; // Take first one for individual call
       } else {
         params.device_id = filters.device_id;
       }
     }
 
-    // Handle port_id filter (single or array)
-    if (filters.port_id !== undefined) {
-      if (Array.isArray(filters.port_id)) {
-        params.port_id = filters.port_id.join(',');
-      } else {
-        params.port_id = filters.port_id;
-      }
-    }
-
-    // Add other filters
-    if (filters.ifName) params.ifName = filters.ifName;
+    // Use correct parameter names based on API documentation
     if (filters.ifType) params.ifType = filters.ifType;
-    if (filters.ifOperStatus) params.ifOperStatus = filters.ifOperStatus;
-    if (filters.fields) params.fields = filters.fields;
+    if (filters.ifOperStatus) params.state = filters.ifOperStatus; // ✅ Correct parameter name
 
+    // Remove unsupported parameters
+    // Note: fields parameter not mentioned in documentation, removing for now
+
+    console.log(`📡 Fetching ports with params:`, params);
     const response = await observiumApi.get('/ports', { params });
 
     // Observium API returns ports in format: { count: N, status: "ok", ports: { "1": {...}, "2": {...} } }
     // Convert to array format
     if (response.data && response.data.ports) {
-      return Object.values(response.data.ports) as ObserviumPort[];
+      const ports = Object.values(response.data.ports) as ObserviumPort[];
+      console.log(`✅ Successfully fetched ${ports.length} ports`);
+      return ports;
     }
 
+    console.log(`⚠️ No ports data in response:`, response.data);
     return [];
   } catch (error) {
     console.error('Error fetching ports from Observium:', error);
@@ -321,50 +331,70 @@ export async function fetchPorts(filters: PortFilters = {}): Promise<ObserviumPo
 /**
  * Fetch performance counters from Observium API
  * Main source for time-series performance data and historical usage trends
+ *
+ * Based on official API documentation:
+ * - Parameters: device_id, entity_id, entity_type, counter_descr
+ * - NO support for date filtering (from/to parameters don't exist)
+ * - Multiple device_ids not supported - use individual calls
  */
 export async function fetchCounters(filters: CounterFilters = {}): Promise<ObserviumCounter[]> {
   try {
+    // If multiple device_ids provided, make individual calls
+    if (Array.isArray(filters.device_id) && filters.device_id.length > 1) {
+      console.log(`📊 Making individual counter calls for ${filters.device_id.length} devices`);
+      const counterPromises = filters.device_id.map(deviceId =>
+        fetchCounters({ ...filters, device_id: deviceId })
+      );
+      const counterArrays = await Promise.all(counterPromises);
+      return counterArrays.flat();
+    }
+
     const params: Record<string, any> = {};
 
-    // Handle device_id filter (single or array)
+    // Handle single device_id (API doesn't support multiple)
     if (filters.device_id !== undefined) {
       if (Array.isArray(filters.device_id)) {
-        params.device_id = filters.device_id.join(',');
+        params.device_id = filters.device_id[0]; // Take first one for individual call
       } else {
         params.device_id = filters.device_id;
       }
     }
 
-    // Handle port_id filter (single or array)
-    if (filters.port_id !== undefined) {
-      if (Array.isArray(filters.port_id)) {
-        params.port_id = filters.port_id.join(',');
-      } else {
-        params.port_id = filters.port_id;
-      }
+    // Use correct parameter names based on API documentation
+    // Note: Only device_id is available in current CounterFilters interface
+    // Additional parameters would need to be added to the interface if needed
+
+    // Remove unsupported parameters
+    // Note: from/to date parameters NOT supported by Observium API
+    // Note: fields parameter not mentioned in documentation
+    // Note: counter_type parameter not mentioned in documentation
+
+    if (filters.from || filters.to) {
+      console.warn('⚠️ Date filtering (from/to) not supported by Observium /counters/ endpoint');
     }
 
-    // Add other filters
-    if (filters.counter_type) params.counter_type = filters.counter_type;
-    if (filters.from) params.from = filters.from;
-    if (filters.to) params.to = filters.to;
-    if (filters.fields) params.fields = filters.fields;
-
+    console.log(`📊 Fetching counters with params:`, params);
     const response = await observiumApi.get('/counters', { params });
 
     // Handle different response formats from Observium API
     if (response.data && response.data.counters) {
       // Format: { count: N, status: "ok", counters: { "1": {...}, "2": {...} } }
-      return Object.values(response.data.counters) as ObserviumCounter[];
+      const counters = Object.values(response.data.counters) as ObserviumCounter[];
+      console.log(`✅ Successfully fetched ${counters.length} counters`);
+      return counters;
     } else if (Array.isArray(response.data)) {
       // Format: [ {...}, {...}, ... ]
+      console.log(`✅ Successfully fetched ${response.data.length} counters`);
       return response.data as ObserviumCounter[];
     }
 
+    console.log(`⚠️ No counters data in response:`, response.data);
     return [];
   } catch (error) {
     console.error('Error fetching counters from Observium:', error);
-    throw new Error(`Failed to fetch counters: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // Return empty array instead of throwing to allow graceful degradation
+    console.warn('Falling back to empty counters array due to API error');
+    return [];
   }
 }
 
@@ -490,34 +520,55 @@ export async function fetchNeighbours(filters: NeighbourFilters = {}): Promise<O
 /**
  * Fetch alerts from Observium API
  * For system alerts and monitoring notifications
+ *
+ * Based on official API documentation:
+ * - Parameters: device_id, status, entity_type, alert_test_id
+ * - Status values: failed, failed_suppressed, delayed
+ * - Multiple device_ids not supported - use individual calls
  */
 export async function fetchObserviumAlerts(filters: AlertFilters = {}): Promise<ObserviumAlert[]> {
   try {
+    // If multiple device_ids provided, make individual calls
+    if (Array.isArray(filters.device_id) && filters.device_id.length > 1) {
+      console.log(`🚨 Making individual alert calls for ${filters.device_id.length} devices`);
+      const alertPromises = filters.device_id.map(deviceId =>
+        fetchObserviumAlerts({ ...filters, device_id: deviceId })
+      );
+      const alertArrays = await Promise.all(alertPromises);
+      return alertArrays.flat();
+    }
+
     const params: Record<string, any> = {};
 
-    // Handle device_id filter (single or array)
+    // Handle single device_id (API doesn't support multiple)
     if (filters.device_id !== undefined) {
       if (Array.isArray(filters.device_id)) {
-        params.device_id = filters.device_id.join(',');
+        params.device_id = filters.device_id[0]; // Take first one for individual call
       } else {
         params.device_id = filters.device_id;
       }
     }
 
-    // Add other filters
+    // Use correct parameter names based on API documentation
+    if (filters.alert_status) params.status = filters.alert_status; // ✅ Correct parameter name
     if (filters.entity_type) params.entity_type = filters.entity_type;
-    if (filters.alert_status) params.alert_status = filters.alert_status;
-    if (filters.acknowledged !== undefined) params.acknowledged = filters.acknowledged;
-    if (filters.fields) params.fields = filters.fields;
 
+    // Remove unsupported parameters
+    // Note: acknowledged parameter not mentioned in documentation
+    // Note: fields parameter not mentioned in documentation
+
+    console.log(`🚨 Fetching alerts with params:`, params);
     const response = await observiumApi.get('/alerts', { params });
 
     // Observium API returns alerts in format: { count: N, status: "ok", alerts: { "1": {...}, "2": {...} } }
     // Convert to array format
     if (response.data && response.data.alerts) {
-      return Object.values(response.data.alerts) as ObserviumAlert[];
+      const alerts = Object.values(response.data.alerts) as ObserviumAlert[];
+      console.log(`✅ Successfully fetched ${alerts.length} alerts`);
+      return alerts;
     }
 
+    console.log(`⚠️ No alerts data in response:`, response.data);
     return [];
   } catch (error) {
     console.error('Error fetching alerts from Observium:', error);
@@ -594,39 +645,45 @@ export async function fetchActiveDevices(): Promise<ObserviumDevice[]> {
 /**
  * Get network interfaces for capacity monitoring
  * Focuses on operational interfaces with traffic data
+ *
+ * ✅ Updated to use correct API parameters
  */
 export async function fetchNetworkInterfaces(deviceIds?: number[]): Promise<ObserviumPort[]> {
   return fetchPorts({
     device_id: deviceIds,
-    ifOperStatus: 'up',
-    fields: 'port_id,device_id,ifIndex,ifName,ifAlias,ifType,ifOperStatus,ifSpeed,ifHighSpeed,ifInOctets,ifOutOctets,poll_time'
+    ifOperStatus: 'up'
+    // Note: fields parameter removed as it's not supported by API
   });
 }
 
 /**
  * Get traffic counters for historical analysis
  * Main method for time-series data used in HU-02 trends
+ *
+ * ⚠️ Note: Date filtering not supported by Observium API
  */
 export async function fetchTrafficCounters(deviceIds?: number[], fromDate?: string, toDate?: string): Promise<ObserviumCounter[]> {
+  if (fromDate || toDate) {
+    console.warn('⚠️ Date filtering not supported by Observium /counters/ endpoint. Returning all available counters.');
+  }
+
   return fetchCounters({
-    device_id: deviceIds,
-    counter_type: 'traffic',
-    from: fromDate,
-    to: toDate,
-    fields: 'counter_id,device_id,port_id,counter_name,counter_value,timestamp,rate'
+    device_id: deviceIds
+    // Note: counter_type, from, to, fields parameters removed as they're not supported by API
   });
 }
 
 /**
  * Get critical alerts for monitoring
  * Focuses on unacknowledged critical alerts
+ *
+ * ✅ Updated to use correct API parameters
  */
 export async function fetchCriticalAlerts(deviceIds?: number[]): Promise<ObserviumAlert[]> {
   return fetchObserviumAlerts({
     device_id: deviceIds,
-    alert_status: 'failed',
-    acknowledged: 0,
-    fields: 'alert_id,device_id,entity_type,entity_id,alert_status,alert_message,timestamp'
+    alert_status: 'failed'
+    // Note: acknowledged and fields parameters removed as they're not supported by API
   });
 }
 
@@ -830,7 +887,7 @@ export async function fetchDeviceMonitoringData(deviceId: number) {
       fetchMemPools({ device_id: deviceId }),
       fetchProcessors({ device_id: deviceId }),
       fetchSensors({ device_id: deviceId }),
-      fetchObserviumAlerts({ device_id: deviceId, acknowledged: 0 })
+      fetchObserviumAlerts({ device_id: deviceId, alert_status: 'failed' })
     ]);
 
     return {
@@ -873,7 +930,7 @@ export async function fetchPlazaOverview(plaza: string) {
 
     const [ports, alerts] = await Promise.all([
       fetchPorts({ device_id: deviceIds }),
-      fetchObserviumAlerts({ device_id: deviceIds, acknowledged: 0 })
+      fetchObserviumAlerts({ device_id: deviceIds, alert_status: 'failed' })
     ]);
 
     // Ensure arrays are safe
@@ -909,11 +966,12 @@ export async function fetchHistoricalPerformance(
   interval: 'hour' | 'day' | 'week' = 'hour'
 ) {
   try {
+    // ⚠️ Note: Date filtering not supported by Observium API
+    console.warn('⚠️ Historical performance: Date filtering not supported by Observium API. Returning all available counters.');
+
     const counters = await fetchCounters({
-      device_id: deviceIds,
-      from: fromDate,
-      to: toDate,
-      fields: 'counter_id,device_id,port_id,counter_name,counter_value,timestamp,rate'
+      device_id: deviceIds
+      // Note: from, to, fields parameters removed as they're not supported by API
     });
 
     // Ensure counters is an array before processing
