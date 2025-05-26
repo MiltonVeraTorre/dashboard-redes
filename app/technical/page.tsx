@@ -8,6 +8,7 @@ import TendenciasUtilizacion from '@/components/TendenciasUtilizacion';
 import AnalisisLatencia from '@/components/AnalisisLatencia';
 import CacheIndicator from '@/components/CacheIndicator';
 import CacheSettings from '@/components/CacheSettings';
+import { ExecutiveSummary } from '@/components/ExecutiveSummary';
 import { useCachedFetch, clearCache } from '@/lib/hooks/useCachedFetch';
 import { cacheManager } from '@/lib/services/cache-manager';
 
@@ -228,6 +229,13 @@ export default function TechnicalPage() {
           </div>
         </div>
       </div>
+
+      {/* Executive Summary */}
+      {selectedPlaza && (
+        <div className="mb-6">
+          <ExecutiveSummary plaza={selectedPlaza} refreshInterval={30} />
+        </div>
+      )}
 
       {/* Plaza Selector with Device Filter */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">

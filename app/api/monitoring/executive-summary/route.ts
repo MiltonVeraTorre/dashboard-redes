@@ -294,7 +294,6 @@ export async function POST(request: NextRequest) {
       dataSource: monitoringData.dataSource,
       cacheTimeRemaining: monitoringData.cacheTimeRemaining
     });
-
   } catch (error) {
     console.error('Error generando resumen ejecutivo:', error);
     return NextResponse.json(
