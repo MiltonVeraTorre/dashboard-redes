@@ -14,7 +14,7 @@ export function Sidebar() {
   const navItems = [
     { name: 'Dashboard Ejecutivo', path: '/', icon: 'chart-pie' },
     { name: 'Monitoreo Técnico', path: '/technical', icon: 'network-wired' },
-    { name: 'Alertas', path: '/alerts', icon: 'bell' },
+    { name: 'Alertas', path: '/capacity-alerts', icon: 'bell' },
     { name: 'Clasificación', path: '/classification', icon: 'chart-line' },
     { name: 'Configuración', path: '/settings', icon: 'gear' },
   ];
