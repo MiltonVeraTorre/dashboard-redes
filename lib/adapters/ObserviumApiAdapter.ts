@@ -310,10 +310,49 @@ export async function fetchPorts(filters: PortFilters = {}): Promise<ObserviumPo
     console.log(`📡 Fetching ports with params:`, params);
     const response = await observiumApi.get('/ports', { params });
 
-    // Observium API returns ports in format: { count: N, status: "ok", ports: { "1": {...}, "2": {...} } }
-    // Convert to array format
-    if (response.data && response.data.ports) {
-      const ports = Object.values(response.data.ports) as ObserviumPort[];
+    // Handle multiple response formats from Observium API
+    // Format 1: { count: N, status: "ok", ports: { "1": {...}, "2": {...} } }
+    // Format 2: [ {...}, {...}, ... ] (direct array)
+    // Format 3: { data: [ {...}, {...}, ... ] }
+    if (response.data) {
+      let rawPorts: any[] = [];
+
+      if (response.data.ports && typeof response.data.ports === 'object') {
+        // Format 1: Object with numbered keys
+        rawPorts = Object.values(response.data.ports);
+      } else if (Array.isArray(response.data)) {
+        // Format 2: Direct array response
+        rawPorts = response.data;
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        // Format 3: Wrapped array
+        rawPorts = response.data.data;
+      } else if (typeof response.data === 'object' && !response.data.ports) {
+        // Format 4: Single object response, convert to array
+        rawPorts = [response.data];
+      }
+
+      // Map raw ports to standardized ObserviumPort interface
+      const ports: ObserviumPort[] = rawPorts.map(rawPort => ({
+        port_id: Number(rawPort.port_id || 0),
+        device_id: Number(rawPort.device_id || 0),
+        ifIndex: Number(rawPort.ifIndex || 0),
+        ifName: String(rawPort.ifName || ''),
+        ifAlias: rawPort.ifAlias ? String(rawPort.ifAlias) : undefined,
+        ifType: String(rawPort.ifType || ''),
+        ifOperStatus: String(rawPort.ifOperStatus || ''),
+        ifAdminStatus: String(rawPort.ifAdminStatus || ''),
+        ifSpeed: rawPort.ifSpeed ? Number(rawPort.ifSpeed) : undefined,
+        ifHighSpeed: rawPort.ifHighSpeed ? Number(rawPort.ifHighSpeed) : undefined,
+        ifMtu: rawPort.ifMtu ? Number(rawPort.ifMtu) : undefined,
+        ifInOctets: rawPort.ifInOctets ? Number(rawPort.ifInOctets) : undefined,
+        ifOutOctets: rawPort.ifOutOctets ? Number(rawPort.ifOutOctets) : undefined,
+        ifInErrors: rawPort.ifInErrors ? Number(rawPort.ifInErrors) : undefined,
+        ifOutErrors: rawPort.ifOutErrors ? Number(rawPort.ifOutErrors) : undefined,
+        ifInUcastPkts: rawPort.ifInUcastPkts ? Number(rawPort.ifInUcastPkts) : undefined,
+        ifOutUcastPkts: rawPort.ifOutUcastPkts ? Number(rawPort.ifOutUcastPkts) : undefined,
+        poll_time: rawPort.poll_time ? String(rawPort.poll_time) : undefined
+      }));
+
       console.log(`✅ Successfully fetched ${ports.length} ports`);
       return ports;
     }
@@ -592,10 +631,41 @@ export async function fetchObserviumAlerts(filters: AlertFilters = {}): Promise<
     console.log(`🚨 Fetching alerts with params:`, params);
     const response = await observiumApi.get('/alerts', { params });
 
-    // Observium API returns alerts in format: { count: N, status: "ok", alerts: { "1": {...}, "2": {...} } }
-    // Convert to array format
-    if (response.data && response.data.alerts) {
-      const alerts = Object.values(response.data.alerts) as ObserviumAlert[];
+    // Handle multiple response formats from Observium API
+    // Format 1: { count: N, status: "ok", alerts: { "1": {...}, "2": {...} } }
+    // Format 2: [ {...}, {...}, ... ] (direct array)
+    // Format 3: { data: [ {...}, {...}, ... ] }
+    if (response.data) {
+      let rawAlerts: any[] = [];
+
+      if (response.data.alerts && typeof response.data.alerts === 'object') {
+        // Format 1: Object with numbered keys
+        rawAlerts = Object.values(response.data.alerts);
+      } else if (Array.isArray(response.data)) {
+        // Format 2: Direct array response
+        rawAlerts = response.data;
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        // Format 3: Wrapped array
+        rawAlerts = response.data.data;
+      } else if (typeof response.data === 'object' && !response.data.alerts) {
+        // Format 4: Single object response, convert to array
+        rawAlerts = [response.data];
+      }
+
+      // Map raw alerts to standardized ObserviumAlert interface
+      const alerts: ObserviumAlert[] = rawAlerts.map(rawAlert => ({
+        alert_id: Number(rawAlert.alert_table_id || rawAlert.alert_id || 0),
+        device_id: Number(rawAlert.device_id || 0),
+        entity_type: String(rawAlert.entity_type || ''),
+        entity_id: Number(rawAlert.entity_id || 0),
+        alert_test_id: Number(rawAlert.alert_test_id || 0),
+        alert_status: String(rawAlert.alert_status || ''),
+        alert_message: String(rawAlert.alert_message || ''),
+        timestamp: String(rawAlert.last_changed || rawAlert.timestamp || ''),
+        last_changed: String(rawAlert.last_changed || ''),
+        acknowledged: Number(rawAlert.acknowledged || 0)
+      }));
+
       console.log(`✅ Successfully fetched ${alerts.length} alerts`);
       return alerts;
     }
