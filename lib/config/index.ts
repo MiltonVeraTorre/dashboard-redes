@@ -3,13 +3,14 @@
 export const config = {
   // API endpoints
   prtg: {
-    baseUrl: process.env.PRTG_BASE_URL || 'https://prtg.example.com',
-    username: process.env.PRTG_USERNAME || 'demo',
-    password: process.env.PRTG_PASSWORD || 'demo',
+    baseUrl: process.env.PRTG_BASE_URL,
+    username: process.env.PRTG_USERNAME,
+    password: process.env.PRTG_PASSWORD,
   },
   observium: {
-    baseUrl: process.env.OBSERVIUM_BASE_URL || 'https://observium.example.com',
-    token: process.env.OBSERVIUM_TOKEN || 'demo-token',
+    baseUrl: process.env.OBSERVIUM_BASE_URL,
+    username: process.env.OBSERVIUM_USERNAME,
+    password: process.env.OBSERVIUM_PASSWORD,
   },
   // Application settings
   refreshInterval: parseInt(process.env.REFRESH_INTERVAL || '300000', 10), // 5 minutes

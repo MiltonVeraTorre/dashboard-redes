@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Tester</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .json-response {
+      background-color: #f8f9fa;
+      border-radius: 4px;
+      padding: 15px;
+      max-height: 500px;
+      overflow-y: auto;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+    .param-row, .header-row {
+      margin-bottom: 10px;
+    }
+    .saved-request {
+      cursor: pointer;
+      padding: 8px;
+      margin-bottom: 5px;
+      border-radius: 4px;
+      background-color: #f8f9fa;
+    }
+    .saved-request:hover {
+      background-color: #e9ecef;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-4">
+    <h1 class="mb-4">API Tester</h1>
+    
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Request</h5>
+          </div>
+          <div class="card-body">
+            <form id="apiForm">
+              <div class="mb-3 row">
+                <div class="col-md-3">
+                  <select id="method" class="form-select">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="PATCH">PATCH</option>
+                  </select>
+                </div>
+                <div class="col-md-9">
+                  <input type="text" id="url" class="form-control" placeholder="Enter URL" required>
+                </div>
+              </div>
+              
+              <ul class="nav nav-tabs mb-3" id="requestTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active" id="params-tab" data-bs-toggle="tab" data-bs-target="#params" type="button" role="tab">Params</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="headers-tab" data-bs-toggle="tab" data-bs-target="#headers" type="button" role="tab">Headers</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="body-tab" data-bs-toggle="tab" data-bs-target="#body" type="button" role="tab">Body</button>
+                </li>
+              </ul>
+              
+              <div class="tab-content" id="requestTabsContent">
+                <div class="tab-pane fade show active" id="params" role="tabpanel">
+                  <div id="paramsContainer">
+                    <!-- Params will be added here -->
+                  </div>
+                  <button type="button" id="addParamBtn" class="btn btn-sm btn-outline-secondary mt-2">Add Parameter</button>
+                </div>
+                
+                <div class="tab-pane fade" id="headers" role="tabpanel">
+                  <div id="headersContainer">
+                    <!-- Headers will be added here -->
+                  </div>
+                  <button type="button" id="addHeaderBtn" class="btn btn-sm btn-outline-secondary mt-2">Add Header</button>
+                </div>
+                
+                <div class="tab-pane fade" id="body" role="tabpanel">
+                  <div class="mb-3">
+                    <textarea id="requestBody" class="form-control" rows="5" placeholder="Enter request body (JSON)"></textarea>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="d-flex justify-content-between">
+                <button type="submit" class="btn btn-primary">Send Request</button>
+                <button type="button" id="saveRequestBtn" class="btn btn-outline-secondary">Save Request</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Response</h5>
+            <div>
+              <span id="statusBadge" class="badge bg-secondary">Status</span>
+              <span id="timeBadge" class="badge bg-secondary">Time</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="responseHeaders" class="mb-3 d-none">
+              <h6>Headers:</h6>
+              <div class="json-response" id="headersResponse"></div>
+            </div>
+            <div id="responseData">
+              <h6>Data:</h6>
+              <div class="json-response" id="dataResponse">No response yet</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Saved Requests</h5>
+          </div>
+          <div class="card-body">
+            <div id="savedRequestsContainer">
+              <!-- Saved requests will be added here -->
+              <div class="text-center text-muted" id="noSavedRequests">
+                No saved requests yet
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+/**
+ * Advanced Cache Manager
+ * 
+ * Provides advanced caching functionality with features like:
+ * - Cache invalidation patterns
+ * - Cache statistics
+ * - Automatic cleanup
+ * - Cache warming
+ */
+
+import { cacheService } from './cache-service';
+
+interface CacheStats {
+  totalKeys: number;
+  totalSize: number;
+  hitRate: number;
+  missRate: number;
+  hits: number;
+  misses: number;
+}
+
+interface CachePattern {
+  pattern: string;
+  ttl: number;
+  description: string;
+}
+
+class CacheManager {
+  private stats = {
+    hits: 0,
+    misses: 0
+  };
+
+  // Cache patterns for different data types
+  private patterns: CachePattern[] = [
+    {
+      pattern: 'plaza-monitoring:*',
+      ttl: 2 * 60 * 1000, // 2 minutes
+      description: 'Plaza monitoring data'
+    },
+    {
+      pattern: 'plaza-trends:*',
+      ttl: 5 * 60 * 1000, // 5 minutes
+      description: 'Plaza utilization trends'
+    },
+    {
+      pattern: 'plaza-latency:*',
+      ttl: 5 * 60 * 1000, // 5 minutes
+      description: 'Plaza latency analysis'
+    },
+    {
+      pattern: 'plaza-daily-trends:*',
+      ttl: 10 * 60 * 1000, // 10 minutes
+      description: 'Plaza daily trends'
+    }
+  ];
+
+  /**
+   * Get data with statistics tracking
+   */
+  get<T>(key: string): T | null {
+    const data = cacheService.get<T>(key);
+    
+    if (data !== null) {
+      this.stats.hits++;
+    } else {
+      this.stats.misses++;
+    }
+    
+    return data;
+  }
+
+  /**
+   * Set data with automatic TTL based on pattern
+   */
+  set<T>(key: string, data: T, customTtl?: number): void {
+    const ttl = customTtl || this.getTtlForKey(key);
+    cacheService.set(key, data, ttl);
+  }
+
+  /**
+   * Get TTL for a key based on patterns
+   */
+  private getTtlForKey(key: string): number {
+    for (const pattern of this.patterns) {
+      if (this.matchesPattern(key, pattern.pattern)) {
+        return pattern.ttl;
+      }
+    }
+    
+    // Default TTL
+    return 5 * 60 * 1000; // 5 minutes
+  }
+
+  /**
+   * Check if key matches pattern (simple wildcard support)
+   */
+  private matchesPattern(key: string, pattern: string): boolean {
+    const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+    return regex.test(key);
+  }
+
+  /**
+   * Invalidate cache by pattern
+   */
+  invalidatePattern(pattern: string): number {
+    let invalidatedCount = 0;
+    
+    // Since we can't iterate over Map keys directly in the cache service,
+    // we'll need to track keys separately or modify the cache service
+    // For now, we'll provide specific invalidation methods
+    
+    return invalidatedCount;
+  }
+
+  /**
+   * Invalidate all plaza data for a specific plaza
+   */
+  invalidatePlaza(plaza: string): void {
+    const patterns = [
+      `plaza-monitoring:${plaza}:*`,
+      `plaza-trends:${plaza}:*`,
+      `plaza-latency:${plaza}:*`,
+      `plaza-daily-trends:${plaza}:*`
+    ];
+
+    patterns.forEach(pattern => {
+      // For now, we'll clear specific known keys
+      // In a production environment, you'd want to track keys or use a more sophisticated cache
+      this.clearKeysMatchingPattern(pattern);
+    });
+  }
+
+  /**
+   * Clear keys matching a pattern (simplified implementation)
+   */
+  private clearKeysMatchingPattern(pattern: string): void {
+    // This is a simplified implementation
+    // In production, you'd want to track all cache keys
+    const commonKeys = this.generateCommonKeys(pattern);
+    commonKeys.forEach(key => cacheService.delete(key));
+  }
+
+  /**
+   * Generate common cache keys for a pattern
+   */
+  private generateCommonKeys(pattern: string): string[] {
+    const keys: string[] = [];
+    
+    if (pattern.includes('plaza-monitoring')) {
+      const plaza = this.extractPlazaFromPattern(pattern);
+      if (plaza) {
+        keys.push(
+          `plaza-monitoring:${plaza}:true:true:5`,
+          `plaza-monitoring:${plaza}:true:false:5`,
+          `plaza-monitoring:${plaza}:false:true:5`
+        );
+      }
+    }
+    
+    if (pattern.includes('plaza-trends')) {
+      const plaza = this.extractPlazaFromPattern(pattern);
+      if (plaza) {
+        keys.push(
+          `plaza-trends:${plaza}:7d:day`,
+          `plaza-trends:${plaza}:30d:day`,
+          `plaza-trends:${plaza}:90d:day`
+        );
+      }
+    }
+    
+    if (pattern.includes('plaza-latency')) {
+      const plaza = this.extractPlazaFromPattern(pattern);
+      if (plaza) {
+        keys.push(
+          `plaza-latency:${plaza}:7d:backbone,distribucion,acceso`,
+          `plaza-latency:${plaza}:30d:backbone,distribucion,acceso`
+        );
+      }
+    }
+    
+    return keys;
+  }
+
+  /**
+   * Extract plaza name from pattern
+   */
+  private extractPlazaFromPattern(pattern: string): string | null {
+    const match = pattern.match(/:([^:*]+):/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getStats(): CacheStats {
+    const total = this.stats.hits + this.stats.misses;
+    
+    return {
+      totalKeys: 0, // Would need to track this in cache service
+      totalSize: 0, // Would need to calculate this
+      hitRate: total > 0 ? (this.stats.hits / total) * 100 : 0,
+      missRate: total > 0 ? (this.stats.misses / total) * 100 : 0,
+      hits: this.stats.hits,
+      misses: this.stats.misses
+    };
+  }
+
+  /**
+   * Reset statistics
+   */
+  resetStats(): void {
+    this.stats.hits = 0;
+    this.stats.misses = 0;
+  }
+
+  /**
+   * Warm up cache for a plaza
+   */
+  async warmUpPlaza(plaza: string): Promise<void> {
+    console.log(`🔥 Warming up cache for plaza: ${plaza}`);
+    
+    try {
+      // Pre-fetch common data
+      const endpoints = [
+        `/api/monitoring/plaza/${encodeURIComponent(plaza)}`,
+        `/api/monitoring/plaza/${encodeURIComponent(plaza)}/trends?period=7d`,
+        `/api/monitoring/plaza/${encodeURIComponent(plaza)}/latency?period=7d`
+      ];
+
+      const promises = endpoints.map(endpoint => 
+        fetch(endpoint).catch(err => 
+          console.warn(`Failed to warm up ${endpoint}:`, err)
+        )
+      );
+
+      await Promise.allSettled(promises);
+      console.log(`✅ Cache warmed up for plaza: ${plaza}`);
+    } catch (error) {
+      console.error(`❌ Failed to warm up cache for plaza ${plaza}:`, error);
+    }
+  }
+
+  /**
+   * Get cache patterns
+   */
+  getPatterns(): CachePattern[] {
+    return [...this.patterns];
+  }
+
+  /**
+   * Clear all cache
+   */
+  clearAll(): void {
+    cacheService.clear();
+    this.resetStats();
+  }
+}
+
+// Export singleton instance
+export const cacheManager = new CacheManager();
