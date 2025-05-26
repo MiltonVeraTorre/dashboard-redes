@@ -46,7 +46,7 @@ export async function GET(
     // Parse query parameters
     const dateParam = searchParams.get('date');
     const intervalParam = searchParams.get('interval');
-    
+
     const targetDate = dateParam ? new Date(dateParam) : new Date();
     const interval = intervalParam ? parseInt(intervalParam, 10) : 60;
 
@@ -56,14 +56,14 @@ export async function GET(
     // Calculate date range for the specific day
     const fromDate = new Date(targetDate);
     fromDate.setHours(0, 0, 0, 0);
-    
+
     const toDate = new Date(targetDate);
     toDate.setHours(23, 59, 59, 999);
 
     try {
       // Get devices for the plaza
       const devices = await ObserviumAdapter.fetchDevicesByPlaza(plaza);
-      
+
       if (devices.length === 0) {
         console.log(`⚠️ No devices found for plaza: ${plaza}`);
         return NextResponse.json({
@@ -105,7 +105,7 @@ export async function GET(
 
     } catch (error) {
       console.warn(`⚠️ Failed to fetch real data for plaza ${plaza}, using fallback:`, error);
-      
+
       // Fallback to generated data
       const trends = generateDailyTrends(plaza, targetDate, interval);
       const summary = calculateDailySummary(trends);
@@ -123,6 +123,7 @@ export async function GET(
     }
 
   } catch (error) {
+    const { plaza: plazaParam } = await params;
     console.error(`❌ Error fetching daily trends for plaza ${plazaParam}:`, error);
 
     return NextResponse.json(
@@ -159,7 +160,7 @@ function generateDailyTrends(plaza: string, targetDate: Date, intervalMinutes: n
 
     // Create realistic daily pattern
     let baseUtilization = 40; // Base utilization
-    
+
     // Business hours pattern (higher during day)
     if (hour >= 8 && hour <= 17) {
       baseUtilization += 30 + (seed * 5); // Peak business hours
@@ -172,8 +173,8 @@ function generateDailyTrends(plaza: string, targetDate: Date, intervalMinutes: n
     // Add some variation based on plaza characteristics
     const hourlyVariation = Math.sin((hour + seed) * 0.3) * 10;
     const randomVariation = (Math.random() - 0.5) * 8;
-    
-    const utilization = Math.max(20, Math.min(95, 
+
+    const utilization = Math.max(20, Math.min(95,
       baseUtilization + hourlyVariation + randomVariation
     ));
 
@@ -202,10 +203,10 @@ function calculateDailySummary(trends: Array<{ time: string; utilization: number
 
   const utilizations = trends.map(t => t.utilization);
   const avgUtilization = utilizations.reduce((sum, u) => sum + u, 0) / utilizations.length;
-  
+
   const maxUtilization = Math.max(...utilizations);
   const minUtilization = Math.min(...utilizations);
-  
+
   const peakIndex = utilizations.indexOf(maxUtilization);
   const lowIndex = utilizations.indexOf(minUtilization);
 

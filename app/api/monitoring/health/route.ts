@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
   console.log('🏥 Starting health check for Observium integration...');
 
   // Test 1: Basic connectivity - Fetch devices
+  let testStart = Date.now();
   try {
-    const testStart = Date.now();
     const devices = await ObserviumAdapter.fetchDevices({ status: 1 });
     const duration = Date.now() - testStart;
 
@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
 
   // Test 2: Plaza filtering - Only if basic connectivity works
   if (tests[0].status === 'pass') {
+    testStart = Date.now();
     try {
-      const testStart = Date.now();
       const laredoDevices = await ObserviumAdapter.fetchDevicesByPlaza('Laredo');
       const duration = Date.now() - testStart;
 
@@ -98,9 +98,8 @@ export async function GET(request: NextRequest) {
 
   // Test 3: Detailed monitoring - Only if detailed flag is set and basic connectivity works
   if (detailed && tests[0].status === 'pass') {
+    testStart = Date.now();
     try {
-      const testStart = Date.now();
-
       // Get first device for testing
       const devices = await ObserviumAdapter.fetchDevices({ status: 1 });
       if (devices.length > 0) {

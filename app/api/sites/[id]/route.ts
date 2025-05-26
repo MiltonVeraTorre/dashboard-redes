@@ -8,10 +8,10 @@ import * as SitesBFF from '@/lib/bff/sites';
  */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const siteId = params.id;
+    const { id: siteId } = await params;
     const siteWithLinks = await SitesBFF.getSiteWithLinks(siteId);
 
     if (!siteWithLinks) {
@@ -23,7 +23,8 @@ export async function GET(
 
     return NextResponse.json(siteWithLinks);
   } catch (error) {
-    console.error(`Error fetching site ${params.id}:`, error);
+    const { id } = await params;
+    console.error(`Error fetching site ${id}:`, error);
     return NextResponse.json(
       { error: 'Failed to fetch site' },
       { status: 500 }
