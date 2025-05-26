@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as MonitoringDomain from '@/lib/domain/monitoring';
+import { cacheService } from '@/lib/services/cache-service';
 
 /**
  * GET /api/monitoring/plaza/[plaza]
@@ -37,6 +38,20 @@ export async function GET(
     const includeCapacity = searchParams.get('includeCapacity') !== 'false';
     const includeTopDevices = searchParams.get('includeTopDevices') !== 'false';
     const topDevicesLimit = parseInt(searchParams.get('topDevicesLimit') || '5', 10);
+
+    // Create cache key based on parameters
+    const cacheKey = `plaza-monitoring:${plaza}:${includeCapacity}:${includeTopDevices}:${topDevicesLimit}`;
+
+    // Check cache first
+    const cachedData = cacheService.get(cacheKey);
+    if (cachedData) {
+      console.log(`🚀 Cache hit for plaza: ${plaza}`);
+      return NextResponse.json({
+        ...cachedData,
+        cached: true,
+        cacheTimeRemaining: cacheService.getTimeRemaining(cacheKey)
+      });
+    }
 
     console.log(`🔍 Fetching monitoring data for plaza: ${plaza}`);
     console.log(`📊 Options: capacity=${includeCapacity}, topDevices=${includeTopDevices}, limit=${topDevicesLimit}`);
@@ -94,6 +109,9 @@ export async function GET(
     }
 
     console.log(`✅ Successfully fetched monitoring data for plaza: ${plaza}`);
+
+    // Cache the response for 2 minutes (monitoring data changes frequently)
+    cacheService.set(cacheKey, response, 2 * 60 * 1000);
 
     return NextResponse.json(response);
   } catch (error) {

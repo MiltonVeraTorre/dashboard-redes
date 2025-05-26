@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as MonitoringDomain from '@/lib/domain/monitoring';
 import * as ObserviumAdapter from '@/lib/adapters/ObserviumApiAdapter';
+import { cacheService } from '@/lib/services/cache-service';
 
 /**
  * GET /api/monitoring/plaza/[plaza]/latency
@@ -49,13 +50,27 @@ export async function GET(
     const networkTypesParam = searchParams.get('networkTypes') || 'backbone,distribucion,acceso';
     const networkTypes = networkTypesParam.split(',');
 
+    // Create cache key
+    const cacheKey = `plaza-latency:${plaza}:${period}:${networkTypes.join(',')}`;
+
+    // Check cache first
+    const cachedData = cacheService.get(cacheKey);
+    if (cachedData) {
+      console.log(`🚀 Cache hit for latency: ${plaza}`);
+      return NextResponse.json({
+        ...cachedData,
+        cached: true,
+        cacheTimeRemaining: cacheService.getTimeRemaining(cacheKey)
+      });
+    }
+
     console.log(`🔍 Fetching latency analysis for plaza: ${plaza}`);
     console.log(`📊 Period: ${period}, Network types: ${networkTypes.join(', ')}`);
 
     // Calculate date range based on period
     const toDate = new Date();
     const fromDate = new Date();
-    
+
     switch (period) {
       case '7d':
         fromDate.setDate(toDate.getDate() - 7);
@@ -70,7 +85,7 @@ export async function GET(
     try {
       // Get devices for the plaza
       const devices = await ObserviumAdapter.fetchDevicesByPlaza(plaza);
-      
+
       if (devices.length === 0) {
         console.log(`⚠️ No devices found for plaza: ${plaza}`);
         return NextResponse.json({
@@ -91,23 +106,28 @@ export async function GET(
 
       console.log(`✅ Successfully generated latency analysis for plaza: ${plaza}`);
 
-      return NextResponse.json({
+      const response = {
         plaza,
         period,
         latencyData,
         summary,
         note: 'Using simulated latency data based on network topology',
         timestamp: new Date().toISOString()
-      });
+      };
+
+      // Cache the response for 5 minutes
+      cacheService.set(cacheKey, response, 5 * 60 * 1000);
+
+      return NextResponse.json(response);
 
     } catch (error) {
       console.warn(`⚠️ Failed to fetch real data for plaza ${plaza}, using fallback:`, error);
-      
+
       // Fallback to generated data
       const latencyData = generateLatencyData(plaza, period, networkTypes);
       const summary = calculateLatencySummary(latencyData);
 
-      return NextResponse.json({
+      const fallbackResponse = {
         plaza,
         period,
         latencyData,
@@ -115,7 +135,12 @@ export async function GET(
         fallback: true,
         warning: 'Using generated data due to API unavailability',
         timestamp: new Date().toISOString()
-      });
+      };
+
+      // Cache fallback data for shorter time (1 minute)
+      cacheService.set(cacheKey, fallbackResponse, 1 * 60 * 1000);
+
+      return NextResponse.json(fallbackResponse);
     }
 
   } catch (error) {
@@ -163,11 +188,11 @@ function generateLatencyData(plaza: string, period: string, networkTypes: string
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      
+
       // Generate different patterns for each plaza and network type
       const variation = Math.sin((i + seed + networkType.length) * 0.6) * 3 + (seed * 0.5);
       const latencia = Math.max(1, baseLatency + variation);
-      
+
       data.push({
         date: date.toISOString().split('T')[0],
         latencia: Math.round(latencia * 10) / 10
