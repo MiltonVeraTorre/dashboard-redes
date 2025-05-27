@@ -233,7 +233,12 @@ export default function TechnicalPage() {
       {/* Executive Summary */}
       {selectedPlaza && (
         <div className="mb-6">
-          <ExecutiveSummary plaza={selectedPlaza} refreshInterval={30} />
+          <ExecutiveSummary
+            plaza={selectedPlaza}
+            refreshInterval={30}
+            plazaData={plazaData}
+            loading={loading}
+          />
         </div>
       )}
 
