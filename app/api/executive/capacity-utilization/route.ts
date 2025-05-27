@@ -202,7 +202,7 @@ export async function GET(request: NextRequest) {
         return 'normal';
       };
 
-      const plazaData: any = {
+      const plazaData = {
         plaza,
         utilization: Math.round(utilizationPercentage * 10) / 10, // Round to 1 decimal
         totalCapacity: Math.round(totalCapacity),

@@ -5,20 +5,20 @@ export interface SelectProps {
   onValueChange?: (value: string) => void
   defaultValue?: string
   disabled?: boolean
-  children?: React.ReactNode
+  children: React.ReactNode
 }
 
 export interface SelectTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  children?: React.ReactNode
+  children: React.ReactNode
 }
 
 export interface SelectContentProps {
-  children?: React.ReactNode
+  children: React.ReactNode
 }
 
 export interface SelectItemProps {
   value: string
-  children?: React.ReactNode
+  children: React.ReactNode
   onSelect?: (value: string) => void
 }
 
@@ -39,9 +39,9 @@ const SelectContext = React.createContext<{
 const Select = ({ value, onValueChange, defaultValue, disabled, children }: SelectProps) => {
   const [open, setOpen] = React.useState(false)
   const [internalValue, setInternalValue] = React.useState(defaultValue || "")
-
+  
   const currentValue = value !== undefined ? value : internalValue
-
+  
   const handleValueChange = (newValue: string) => {
     if (value === undefined) {
       setInternalValue(newValue)
@@ -62,14 +62,14 @@ const Select = ({ value, onValueChange, defaultValue, disabled, children }: Sele
 const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(
   ({ className = "", children, ...props }, ref) => {
     const { open, setOpen } = React.useContext(SelectContext)
-
+    
     return (
       <button
         ref={ref}
         type="button"
         className={`
-          flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm
-          ring-offset-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500
+          flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm 
+          ring-offset-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 
           focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50
           ${className}
         `}
@@ -93,9 +93,9 @@ SelectTrigger.displayName = "SelectTrigger"
 
 const SelectContent = ({ children }: SelectContentProps) => {
   const { open } = React.useContext(SelectContext)
-
+  
   if (!open) return null
-
+  
   return (
     <div className="absolute top-full z-50 mt-1 w-full rounded-md border bg-white shadow-lg">
       <div className="max-h-60 overflow-auto p-1">
@@ -107,12 +107,12 @@ const SelectContent = ({ children }: SelectContentProps) => {
 
 const SelectItem = ({ value, children, onSelect }: SelectItemProps) => {
   const { onValueChange } = React.useContext(SelectContext)
-
+  
   const handleSelect = () => {
     onValueChange?.(value)
     onSelect?.(value)
   }
-
+  
   return (
     <div
       className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-100 focus:bg-gray-100"
@@ -125,7 +125,7 @@ const SelectItem = ({ value, children, onSelect }: SelectItemProps) => {
 
 const SelectValue = ({ placeholder }: SelectValueProps) => {
   const { value } = React.useContext(SelectContext)
-
+  
   return (
     <span className={value ? "" : "text-gray-500"}>
       {value || placeholder}

@@ -220,8 +220,8 @@ export function NetworkCostAnalysisCard({ height = 300, includeProjections = fal
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-                <Tooltip
-                  formatter={(value: any, name: any) => [
+                <Tooltip 
+                  formatter={(value, name) => [
                     name === 'efficiency' ? `${value}%` : formatCurrency(value as number, data.currency),
                     name === 'efficiency' ? 'Eficiencia' : 'Costo Mensual'
                   ]}
@@ -247,14 +247,14 @@ export function NetworkCostAnalysisCard({ height = 300, includeProjections = fal
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip
-                  formatter={(value: any) => [formatCompactCurrency(value as number, data.currency), 'Costo']}
-                  labelFormatter={(label: any) => `Mes: ${label}`}
+                <Tooltip 
+                  formatter={(value) => [formatCompactCurrency(value as number, data.currency), 'Costo']}
+                  labelFormatter={(label) => `Mes: ${label}`}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="cost"
-                  stroke="#3B82F6"
+                <Line 
+                  type="monotone" 
+                  dataKey="cost" 
+                  stroke="#3B82F6" 
                   strokeWidth={2}
                   dot={{ r: 3 }}
                 />
@@ -294,8 +294,8 @@ export function NetworkCostAnalysisCard({ height = 300, includeProjections = fal
             {breakdown.slice(0, 3).map((location, index) => (
               <div key={index} className="flex items-center justify-between text-xs">
                 <div className="flex items-center space-x-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
+                  <div 
+                    className="w-2 h-2 rounded-full" 
                     style={{ backgroundColor: getEfficiencyColor(location.efficiency) }}
                   ></div>
                   <span className="font-medium">{location.location}</span>
