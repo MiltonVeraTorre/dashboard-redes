@@ -18,10 +18,7 @@ export function CriticalSitesList() {
   // Use SWR for data fetching with automatic revalidation
   const { data: sites, error, isLoading } = useSWR<RankedSite[]>(
     'criticalSites',
-    async () => {
-      const result = await fetchCriticalSites(5);
-      return result as RankedSite[];
-    },
+    () => fetchCriticalSites(5),
     {
       refreshInterval: 60000, // Refresh every minute
       revalidateOnFocus: true,
@@ -113,7 +110,7 @@ export function CriticalSitesList() {
               width={100}
             />
             <Tooltip
-              formatter={(value: number) => [`${value}%`, 'Utilización']}
+              formatter={(value) => [`${value}%`, 'Utilización']}
             />
             <Bar dataKey="percentage" name="Utilización">
               {chartData.map((entry, index) => (

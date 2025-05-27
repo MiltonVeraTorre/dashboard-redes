@@ -174,7 +174,7 @@ export default function CustomerUtilizationChart() {
             <div className="flex gap-2">
               <Select value={threshold} onValueChange={setThreshold}>
                 <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Select threshold" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="70">70% Threshold</SelectItem>
@@ -184,7 +184,7 @@ export default function CustomerUtilizationChart() {
               </Select>
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Sort by" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="utilization">By Utilization</SelectItem>
@@ -278,7 +278,7 @@ export default function CustomerUtilizationChart() {
                       name === 'x' ? formatMbps(value) : formatMbps(value),
                       name === 'x' ? 'Contracted' : 'Current Usage'
                     ]}
-                    labelFormatter={(label: any, payload: any) => {
+                    labelFormatter={(label, payload) => {
                       if (payload && payload[0]) {
                         const data = payload[0].payload;
                         return `${data.customerName} (${data.utilizationRate.toFixed(1)}%)`;

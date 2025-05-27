@@ -223,11 +223,9 @@ export default function NetworkHealthScore() {
                 <div className="text-3xl font-bold" style={{ color: getScoreColor(data.overallScore) }}>
                   {data.overallScore}
                 </div>
-                <div className="mt-2">
-                  <Badge variant={getStatusBadgeVariant(data.status)}>
-                    {data.status.toUpperCase()}
-                  </Badge>
-                </div>
+                <Badge variant={getStatusBadgeVariant(data.status)} className="mt-2">
+                  {data.status.toUpperCase()}
+                </Badge>
               </div>
             </div>
 

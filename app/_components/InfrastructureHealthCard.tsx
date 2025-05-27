@@ -203,7 +203,7 @@ export function InfrastructureHealthCard({ height = 300, includeDetails = false 
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value: any, name: any) => [value, name]} />
+              <Tooltip formatter={(value, name) => [value, name]} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -216,7 +216,7 @@ export function InfrastructureHealthCard({ height = 300, includeDetails = false 
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(value: any) => [`${value}%`, 'Salud']} />
+              <Tooltip formatter={(value) => [`${value}%`, 'Salud']} />
               <Bar dataKey="value" radius={[2, 2, 0, 0]}>
                 {healthMetrics.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -257,8 +257,8 @@ export function InfrastructureHealthCard({ height = 300, includeDetails = false 
             {breakdown.slice(0, 3).map((location, index) => (
               <div key={index} className="flex items-center justify-between text-xs">
                 <div className="flex items-center space-x-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
+                  <div 
+                    className="w-2 h-2 rounded-full" 
                     style={{ backgroundColor: STATUS_COLORS[location.status] }}
                   ></div>
                   <span className="font-medium">{location.location}</span>

@@ -240,23 +240,23 @@ export function EnvironmentalMonitoringCard({ height = 300, alertThreshold = 35 
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis domain={['dataMin - 2', 'dataMax + 2']} tick={{ fontSize: 10 }} />
-                <Tooltip
-                  formatter={(value: any, name: any) => [
+                <Tooltip 
+                  formatter={(value, name) => [
                     `${value}°C`,
                     name === 'avgTemp' ? 'Promedio' : 'Máxima'
                   ]}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="avgTemp"
-                  stroke="#3B82F6"
-                  fill="#3B82F6"
+                <Area 
+                  type="monotone" 
+                  dataKey="avgTemp" 
+                  stroke="#3B82F6" 
+                  fill="#3B82F6" 
                   fillOpacity={0.3}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="maxTemp"
-                  stroke="#EF4444"
+                <Line 
+                  type="monotone" 
+                  dataKey="maxTemp" 
+                  stroke="#EF4444" 
                   strokeWidth={2}
                   dot={{ r: 2 }}
                 />
@@ -294,8 +294,8 @@ export function EnvironmentalMonitoringCard({ height = 300, alertThreshold = 35 
             {breakdown.slice(0, 3).map((location, index) => (
               <div key={index} className="flex items-center justify-between text-xs">
                 <div className="flex items-center space-x-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
+                  <div 
+                    className="w-2 h-2 rounded-full" 
                     style={{ backgroundColor: STATUS_COLORS[location.status] }}
                   ></div>
                   <span className="font-medium">{location.location}</span>

@@ -243,7 +243,7 @@ export default function RevenueAnalyticsChart() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ category, customers }: any) => `${category}: ${customers}`}
+                    label={({ category, customers }) => `${category}: ${customers}`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="customers"

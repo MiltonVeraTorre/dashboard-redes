@@ -164,8 +164,7 @@ export async function GET(
 
     return NextResponse.json(response);
   } catch (error) {
-    const { id } = await params;
-    console.error(`❌ Error fetching monitoring data for device ${id}:`, error);
+    console.error(`❌ Error fetching monitoring data for device ${params.id}:`, error);
 
     return NextResponse.json(
       {
