@@ -157,6 +157,20 @@ export function CriticalSitesPanel({ limit = 10, threshold = 75 }: CriticalSites
 
   return (
     <div className="h-full">
+      {/* Data Source Indicator */}
+      <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${isDemo ? 'bg-orange-400' : 'bg-green-400'}`}></div>
+          <span>
+            {dataSource === 'observium_data' ? 'Datos en tiempo real de Observium' :
+             dataSource === 'observium_api_empty' ? 'Sin datos en Observium' :
+             dataSource === 'demo_data' ? 'Datos de demostración' :
+             'Fuente desconocida'}
+          </span>
+        </div>
+        <span>Actualizado: {new Date(lastUpdated).toLocaleTimeString('es-ES')}</span>
+      </div>
+
       {/* Header with summary */}
       {summary && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg">

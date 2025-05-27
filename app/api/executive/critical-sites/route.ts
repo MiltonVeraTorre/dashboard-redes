@@ -49,93 +49,36 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔍 Fetching critical sites data (limit: ${limit}, threshold: ${threshold}%)`);
 
-    // Step 1: Get all devices with location information (using pagination for safety)
+    // Step 1: Get all devices (without field filtering to avoid issues)
     const devicesResponse = await observiumApi.get('/devices', {
       params: {
-        fields: 'device_id,hostname,location,status,type,os,uptime',
-        pagesize: 100, // Limit to prevent large responses
-        status: 1 // Only active devices
+        pagesize: 50 // Smaller page size for testing
+        // Removed fields and status filters to get all devices
       }
     });
 
     if (!devicesResponse.data || !devicesResponse.data.devices ||
         (Array.isArray(devicesResponse.data.devices) && devicesResponse.data.devices.length === 0) ||
         (typeof devicesResponse.data.devices === 'object' && Object.keys(devicesResponse.data.devices).length === 0)) {
-      console.warn('⚠️ No devices found in Observium response, generating demo data');
-
-      // Generate demo data for empty Observium instance
-      const demoData = [
-        {
-          site: 'CDMX-Norte-01',
-          plaza: 'CDMX',
-          healthScore: 65,
-          utilization: 85.2,
-          alertCount: 3,
-          deviceCount: 4,
-          portCount: 48,
-          status: 'critical',
-          issues: ['High port utilization', 'Multiple device alerts'],
-          lastUpdated: new Date().toISOString(),
-          devices: [
-            { device_id: '1', hostname: 'CDMX-Norte-01-SW1', type: 'switch', os: 'ios' },
-            { device_id: '2', hostname: 'CDMX-Norte-01-SW2', type: 'switch', os: 'ios' },
-            { device_id: '3', hostname: 'CDMX-Norte-01-RTR1', type: 'router', os: 'ios' },
-            { device_id: '4', hostname: 'CDMX-Norte-01-FW1', type: 'firewall', os: 'asa' }
-          ]
-        },
-        {
-          site: 'Queretaro-Centro-02',
-          plaza: 'Queretaro',
-          healthScore: 72,
-          utilization: 78.9,
-          alertCount: 2,
-          deviceCount: 3,
-          portCount: 36,
-          status: 'warning',
-          issues: ['High port utilization', 'Device alerts present'],
-          lastUpdated: new Date().toISOString(),
-          devices: [
-            { device_id: '5', hostname: 'QRO-Centro-02-SW1', type: 'switch', os: 'ios' },
-            { device_id: '6', hostname: 'QRO-Centro-02-RTR1', type: 'router', os: 'ios' },
-            { device_id: '7', hostname: 'QRO-Centro-02-AP1', type: 'wireless', os: 'ios' }
-          ]
-        },
-        {
-          site: 'Miami-South-03',
-          plaza: 'Miami',
-          healthScore: 78,
-          utilization: 76.4,
-          alertCount: 1,
-          deviceCount: 2,
-          portCount: 24,
-          status: 'attention',
-          issues: ['High port utilization'],
-          lastUpdated: new Date().toISOString(),
-          devices: [
-            { device_id: '8', hostname: 'MIA-South-03-SW1', type: 'switch', os: 'ios' },
-            { device_id: '9', hostname: 'MIA-South-03-RTR1', type: 'router', os: 'ios' }
-          ]
-        }
-      ];
-
-      const demoSummary = {
-        totalCriticalSites: demoData.length,
-        averageHealthScore: Math.round((demoData.reduce((sum, site) => sum + site.healthScore, 0) / demoData.length) * 10) / 10,
-        totalAlerts: demoData.reduce((sum, site) => sum + site.alertCount, 0),
-        criticalThreshold: threshold,
-        statusBreakdown: {
-          critical: demoData.filter(s => s.status === 'critical').length,
-          warning: demoData.filter(s => s.status === 'warning').length,
-          attention: demoData.filter(s => s.status === 'attention').length
-        }
-      };
+      console.warn('⚠️ No devices found in Observium response');
 
       return NextResponse.json({
-        data: demoData.slice(0, limit),
-        summary: demoSummary,
+        data: [],
+        summary: {
+          totalCriticalSites: 0,
+          averageHealthScore: 0,
+          totalAlerts: 0,
+          criticalThreshold: threshold,
+          statusBreakdown: {
+            critical: 0,
+            warning: 0,
+            attention: 0
+          }
+        },
         timestamp: new Date().toISOString(),
-        demo: true,
-        source: 'demo_data'
+        demo: false,
+        source: 'observium_api_empty',
+        error: 'No devices found in Observium monitoring system'
       });
     }
 
@@ -144,12 +87,32 @@ export async function GET(request: NextRequest) {
     const devices = Object.values(devicesResponse.data.devices) as any[];
 
     devices.forEach((device: any) => {
-      // Extract site identifier from hostname (e.g., "CDMX-Norte-01-SW1" -> "CDMX-Norte-01")
+      // Improved site identification logic based on real Observium data patterns
       const hostname = device.hostname || '';
-      const siteParts = hostname.split('-');
-      const site = siteParts.length >= 3
-        ? `${siteParts[0]}-${siteParts[1]}-${siteParts[2]}`
-        : hostname.split('.')[0] || device.location || 'Unknown';
+      const location = device.location || '';
+
+      let site: string;
+
+      // Pattern 1: core-* devices (e.g., "core-border_saltillo", "core-garcia")
+      if (hostname.startsWith('core-')) {
+        const coreParts = hostname.replace('core-', '').split('_');
+        site = coreParts.length > 1 ? coreParts.join('-') : coreParts[0];
+      }
+      // Pattern 2: IP-based hostnames (e.g., "172.19.99.1")
+      else if (hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+        // Use location for IP-based devices
+        const locationParts = location.split(',').map(p => p.trim());
+        site = locationParts.length >= 2
+          ? `${locationParts[1]}-${locationParts[0]}` // "Saltillo-Coahuila"
+          : locationParts[0] || hostname;
+      }
+      // Pattern 3: Standard hostname patterns (e.g., "CDMX-Norte-01-SW1")
+      else {
+        const siteParts = hostname.split('-');
+        site = siteParts.length >= 3
+          ? `${siteParts[0]}-${siteParts[1]}-${siteParts[2]}`
+          : hostname.split('.')[0] || location || 'Unknown';
+      }
 
       if (!devicesBySite[site]) {
         devicesBySite[site] = [];
@@ -174,15 +137,30 @@ export async function GET(request: NextRequest) {
         if (alertsResponse.data && alertsResponse.data.alerts) {
           const alerts = Object.values(alertsResponse.data.alerts) as any[];
 
-          // Group alerts by device and then by site
+          // Group alerts by device and then by site (using same logic as device grouping)
           alerts.forEach((alert: any) => {
             const device = devices.find(d => d.device_id === alert.device_id);
             if (device) {
               const hostname = device.hostname || '';
-              const siteParts = hostname.split('-');
-              const site = siteParts.length >= 3
-                ? `${siteParts[0]}-${siteParts[1]}-${siteParts[2]}`
-                : hostname.split('.')[0] || device.location || 'Unknown';
+              const location = device.location || '';
+
+              let site: string;
+
+              // Use same site identification logic as device grouping
+              if (hostname.startsWith('core-')) {
+                const coreParts = hostname.replace('core-', '').split('_');
+                site = coreParts.length > 1 ? coreParts.join('-') : coreParts[0];
+              } else if (hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+                const locationParts = location.split(',').map(p => p.trim());
+                site = locationParts.length >= 2
+                  ? `${locationParts[1]}-${locationParts[0]}`
+                  : locationParts[0] || hostname;
+              } else {
+                const siteParts = hostname.split('-');
+                site = siteParts.length >= 3
+                  ? `${siteParts[0]}-${siteParts[1]}-${siteParts[2]}`
+                  : hostname.split('.')[0] || location || 'Unknown';
+              }
 
               if (!alertsBySite[site]) {
                 alertsBySite[site] = [];
