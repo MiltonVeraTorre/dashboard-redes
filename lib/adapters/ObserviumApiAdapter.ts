@@ -690,10 +690,14 @@ export async function fetchObserviumAlerts(filters: AlertFilters = {}): Promise<
  */
 export async function fetchDevicesByPlaza(plaza: string): Promise<ObserviumDevice[]> {
   try {
+    console.log(`🔍 Fetching devices for plaza: ${plaza}`);
+
     // First try to get all devices and filter by location since group field is null
     const allDevices = await fetchDevices({
       // Remove fields filter to get all data
     });
+
+    console.log(`📊 Total devices fetched from API: ${allDevices.length}`);
 
     // Filter devices by location containing the plaza name
     const filteredDevices = allDevices.filter(device => {
@@ -708,15 +712,29 @@ export async function fetchDevicesByPlaza(plaza: string): Promise<ObserviumDevic
       };
 
       const patterns = locationPatterns[plaza] || [plaza];
-      return patterns.some(pattern =>
+      const matches = patterns.some(pattern =>
         device.location.toLowerCase().includes(pattern.toLowerCase())
       );
+
+      if (matches) {
+        console.log(`✅ Device ${device.hostname} matches plaza ${plaza} (location: ${device.location})`);
+      }
+
+      return matches;
     });
 
-    console.log(`Found ${filteredDevices.length} devices for plaza ${plaza}`);
+    console.log(`✅ Found ${filteredDevices.length} devices for plaza ${plaza}`);
+
+    if (filteredDevices.length === 0) {
+      console.log(`⚠️ No devices found for plaza ${plaza}. Sample locations from API:`,
+        allDevices.slice(0, 5).map(d => ({ hostname: d.hostname, location: d.location }))
+      );
+    }
+
     return filteredDevices;
   } catch (error) {
-    console.error(`Error fetching devices for plaza ${plaza}:`, error);
+    console.error(`❌ Error fetching devices for plaza ${plaza}:`, error);
+    console.error(`❌ Error details:`, error instanceof Error ? error.message : 'Unknown error');
     // Return empty array on error instead of throwing
     return [];
   }

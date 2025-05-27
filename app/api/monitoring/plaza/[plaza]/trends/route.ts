@@ -128,8 +128,8 @@ export async function GET(
         timestamp: new Date().toISOString()
       };
 
-      // Cache the response for 5 minutes (trends data changes less frequently)
-      cacheService.set(cacheKey, response, 5 * 60 * 1000);
+      // Cache the response for 1 hour (trends data for executive context)
+      cacheService.set(cacheKey, response, 60 * 60 * 1000);
 
       return NextResponse.json(response);
 

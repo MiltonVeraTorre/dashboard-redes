@@ -66,6 +66,18 @@ export async function GET(
       timestamp: new Date().toISOString()
     };
 
+    // Save plaza data to monitoring cache for executive summary use
+    // This ensures that when executive summary is generated, it has access to real data
+    if (overview && overview.devices && overview.devices.length > 0) {
+      try {
+        const { MonitoringDataService } = await import('@/lib/services/monitoring-data-service');
+        await MonitoringDataService.saveDashboardDataToCache(response, plaza);
+        console.log(`💾 Plaza data saved to monitoring cache for executive summary: ${plaza}`);
+      } catch (error) {
+        console.warn(`⚠️ Failed to save plaza data to monitoring cache:`, error);
+      }
+    }
+
     // Fetch capacity summary if requested
     if (includeCapacity) {
       console.log(`📈 Fetching capacity summary for ${plaza}...`);
@@ -110,8 +122,8 @@ export async function GET(
 
     console.log(`✅ Successfully fetched monitoring data for plaza: ${plaza}`);
 
-    // Cache the response for 2 minutes (monitoring data changes frequently)
-    cacheService.set(cacheKey, response, 2 * 60 * 1000);
+    // Cache the response for 1 hour (executive summary context - data doesn't need frequent updates)
+    cacheService.set(cacheKey, response, 60 * 60 * 1000);
 
     return NextResponse.json(response);
   } catch (error) {

@@ -115,8 +115,8 @@ export async function GET(
         timestamp: new Date().toISOString()
       };
 
-      // Cache the response for 5 minutes
-      cacheService.set(cacheKey, response, 5 * 60 * 1000);
+      // Cache the response for 1 hour
+      cacheService.set(cacheKey, response, 60 * 60 * 1000);
 
       return NextResponse.json(response);
 
