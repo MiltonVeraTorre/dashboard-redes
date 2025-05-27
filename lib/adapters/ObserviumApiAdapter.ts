@@ -279,12 +279,24 @@ export async function fetchDevices(filters: DeviceFilters = {}): Promise<Observi
  */
 export async function fetchPorts(filters: PortFilters = {}): Promise<ObserviumPort[]> {
   try {
+    // CRITICAL: Always require device_id filter to prevent memory exhaustion on Observium server
+    if (!filters.device_id) {
+      throw new Error('device_id filter is required when fetching ports to prevent Observium server memory exhaustion. Fetching all ports at once causes HTTP 500 errors.');
+    }
+
     // If multiple device_ids provided, make individual calls
     if (Array.isArray(filters.device_id) && filters.device_id.length > 1) {
       console.log(`📡 Making individual port calls for ${filters.device_id.length} devices`);
-      const portPromises = filters.device_id.map(deviceId =>
-        fetchPorts({ ...filters, device_id: deviceId })
-      );
+      const portPromises = filters.device_id.map(async (deviceId) => {
+        try {
+          const ports = await fetchPorts({ ...filters, device_id: deviceId });
+          console.log(`✅ Successfully fetched ${ports.length} ports for device ${deviceId}`);
+          return ports;
+        } catch (error) {
+          console.warn(`⚠️ Failed to fetch ports for device ${deviceId}:`, error instanceof Error ? error.message : 'Unknown error');
+          return []; // Return empty array for failed devices instead of failing entire operation
+        }
+      });
       const portArrays = await Promise.all(portPromises);
       return portArrays.flat();
     }
@@ -292,12 +304,10 @@ export async function fetchPorts(filters: PortFilters = {}): Promise<ObserviumPo
     const params: Record<string, any> = {};
 
     // Handle single device_id (API doesn't support multiple)
-    if (filters.device_id !== undefined) {
-      if (Array.isArray(filters.device_id)) {
-        params.device_id = filters.device_id[0]; // Take first one for individual call
-      } else {
-        params.device_id = filters.device_id;
-      }
+    if (Array.isArray(filters.device_id)) {
+      params.device_id = filters.device_id[0]; // Take first one for individual call
+    } else {
+      params.device_id = filters.device_id;
     }
 
     // Use correct parameter names based on API documentation
@@ -361,9 +371,7 @@ export async function fetchPorts(filters: PortFilters = {}): Promise<ObserviumPo
     return [];
   } catch (error) {
     console.error('Error fetching ports from Observium:', error);
-    // Return empty array instead of throwing to allow graceful degradation
-    console.warn('Falling back to empty ports array due to API error');
-    return [];
+    throw new Error(`Failed to fetch ports from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -431,9 +439,7 @@ export async function fetchCounters(filters: CounterFilters = {}): Promise<Obser
     return [];
   } catch (error) {
     console.error('Error fetching counters from Observium:', error);
-    // Return empty array instead of throwing to allow graceful degradation
-    console.warn('Falling back to empty counters array due to API error');
-    return [];
+    throw new Error(`Failed to fetch counters from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -674,9 +680,7 @@ export async function fetchObserviumAlerts(filters: AlertFilters = {}): Promise<
     return [];
   } catch (error) {
     console.error('Error fetching alerts from Observium:', error);
-    // Return empty array instead of throwing to allow graceful degradation
-    console.warn('Falling back to empty alerts array due to API error');
-    return [];
+    throw new Error(`Failed to fetch alerts from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -828,7 +832,7 @@ export async function fetchLinks(): Promise<Link[]> {
 
     // Transform Observium ports to Link entities
     const links: Link[] = ports.map(port => {
-      const capacity = port.ifHighSpeed ? port.ifHighSpeed : (port.ifSpeed ? port.ifSpeed / 1000000 : 0); // Convert to Mbps
+      const capacity = port.ifHighSpeed ? Number(port.ifHighSpeed) : (port.ifSpeed ? Number(port.ifSpeed) / 1000000 : 0); // Convert to Mbps
       const currentUsage = calculateCurrentUsage(port);
       const utilizationPercentage = capacity > 0 ? Math.min((currentUsage / capacity) * 100, 100) : 0;
 
@@ -884,17 +888,16 @@ export async function fetchAlerts(): Promise<Alert[]> {
 
 /**
  * Calculate current usage from port statistics
- * Uses the higher of input or output octets per second
+ * Uses the higher of input or output octets per second rate data
  */
 function calculateCurrentUsage(port: ObserviumPort): number {
-  // This is a simplified calculation
-  // In a real implementation, you would need rate data or calculate from deltas
-  const inOctetsPerSec = port.ifInOctets || 0;
-  const outOctetsPerSec = port.ifOutOctets || 0;
+  // Use the rate fields which contain octets per second, not cumulative counters
+  const inOctetsRate = Number(port.ifInOctets_rate || 0);
+  const outOctetsRate = Number(port.ifOutOctets_rate || 0);
 
   // Convert octets per second to Mbps (8 bits per octet, 1,000,000 bits per Mbps)
-  const inMbps = (inOctetsPerSec * 8) / 1000000;
-  const outMbps = (outOctetsPerSec * 8) / 1000000;
+  const inMbps = (inOctetsRate * 8) / 1000000;
+  const outMbps = (outOctetsRate * 8) / 1000000;
 
   // Return the higher utilization
   return Math.max(inMbps, outMbps);
@@ -1142,7 +1145,7 @@ export async function fetchSaturationAnalysis(plazas?: string[]) {
 
     // Analyze saturation levels
     const saturationAnalysis = ports.map(port => {
-      const capacity = port.ifHighSpeed || (port.ifSpeed ? port.ifSpeed / 1000000 : 0);
+      const capacity = port.ifHighSpeed ? Number(port.ifHighSpeed) : (port.ifSpeed ? Number(port.ifSpeed) / 1000000 : 0);
       const currentUsage = calculateCurrentUsage(port);
       const utilizationPercentage = capacity > 0 ? (currentUsage / capacity) * 100 : 0;
 

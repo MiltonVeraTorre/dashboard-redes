@@ -1,76 +1,79 @@
 /**
  * Observium Repository
- * 
+ *
  * This module provides functions to fetch data from the Observium API
  * and transform it into domain entities.
  */
 
-import { observiumApi } from '@/lib/adapters/ObserviumApiAdapter';
-import { 
-  ObserviumDevicesResponse, 
-  ObserviumPortsResponse, 
-  ObserviumAlertsResponse,
+import {
+  observiumApi,
+  fetchDevices as fetchObserviumDevices,
+  fetchPorts as fetchObserviumPorts,
   ObserviumDevice,
-  ObserviumPort,
   ObserviumAlert
+} from '@/lib/adapters/ObserviumApiAdapter';
+import {
+  ObserviumPort,
+  ObserviumAlertsResponse
 } from '@/lib/domain/observium-types';
-import {  
-  Alert, 
-  Site, 
-  Link 
+import {
+  Alert,
+  Site,
+  Link
 } from '@/lib/domain/entities';
 
 /**
  * Fetch devices from Observium API
+ * Only returns real data - throws errors if API is unavailable
  */
 export async function fetchDevices(): Promise<ObserviumDevice[]> {
   try {
-    const response = await observiumApi.get<ObserviumDevicesResponse>('/devices', {
-      params: {
-        fields: 'device_id,hostname,status,location,os,version,vendor,hardware'
-      }
-    });
-    
-    const devices = response.data.devices || {};
-    return Object.values(devices);
+    // Use the proper adapter function that handles the response format correctly
+    // Note: fields parameter removed because it causes Observium API to return 0 devices
+    const devices = await fetchObserviumDevices({});
+
+    console.log(`📊 Repository: Found ${devices.length} devices from Observium`);
+    return devices;
   } catch (error) {
-    console.error('Error fetching devices from Observium:', error);
-    throw error;
+    console.error('Error fetching devices from Observium API:', error);
+    throw new Error(`Failed to fetch devices from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
  * Fetch ports from Observium API
+ * Only returns real data - throws errors if API is unavailable
+ * Fetches devices first, then ports for each device to avoid memory exhaustion
+ * Limits to first 50 devices to prevent connection timeouts
  */
 export async function fetchPorts(): Promise<ObserviumPort[]> {
   try {
-    // First fetch just the port IDs
-    const portsListResponse = await observiumApi.get<ObserviumPortsResponse>('/ports', {
-      params: {
-        fields: 'port_id'
-      }
+    // First fetch all devices to get device IDs
+    console.log('📊 Repository: Fetching devices to get device IDs for port queries');
+    // Note: fields parameter removed because it causes Observium API to return 0 devices
+    const devices = await fetchObserviumDevices({});
+
+    if (devices.length === 0) {
+      console.log('📊 Repository: No devices found, returning empty ports array');
+      return [];
+    }
+
+    // Limit to first 50 devices to prevent connection timeouts and excessive API calls
+    const limitedDevices = devices.slice(0, 50);
+    const deviceIds = limitedDevices.map(device => device.device_id);
+    console.log(`📊 Repository: Fetching ports for ${deviceIds.length} devices (limited from ${devices.length} total devices)`);
+
+    // Fetch ports for limited devices (the adapter will handle individual calls)
+    const ports = await fetchObserviumPorts({
+      device_id: deviceIds,
+      ifOperStatus: 'up'
     });
-    
-    const portIds = Object.values(portsListResponse.data.ports || {}).map(port => port.port_id);
-    
-    // Then fetch details for each port
-    // Note: In a production environment, you might want to batch these requests
-    // or implement pagination to avoid overloading the API
-    const portDetailsPromises = portIds.slice(0, 50).map(async (portId) => {
-      try {
-        const response = await observiumApi.get(`/ports/${portId}`);
-        return response.data.port;
-      } catch (error) {
-        console.error(`Error fetching details for port ${portId}:`, error);
-        return null;
-      }
-    });
-    
-    const portDetails = await Promise.all(portDetailsPromises);
-    return portDetails.filter(Boolean) as ObserviumPort[];
+
+    console.log(`📊 Repository: Found ${ports.length} ports from Observium`);
+    return ports;
   } catch (error) {
-    console.error('Error fetching ports from Observium:', error);
-    throw error;
+    console.error('Error fetching ports from Observium API:', error);
+    throw new Error(`Failed to fetch ports from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -85,7 +88,7 @@ export async function fetchAlerts(limit: number = 10): Promise<ObserviumAlert[]>
         limit
       }
     });
-    
+
     const alerts = response.data.alerts || {};
     return Object.values(alerts);
   } catch (error) {
@@ -128,7 +131,7 @@ function mapAlertSeverity(severity: string): 'info' | 'warning' | 'critical' {
  */
 export function mapDevicesToSites(devices: ObserviumDevice[]): Site[] {
   return devices.map(device => ({
-    id: device.device_id,
+    id: device.device_id.toString(),
     name: device.hostname || `Device ${device.device_id}`,
     plaza: device.location || 'Unknown',
   }));
@@ -136,48 +139,54 @@ export function mapDevicesToSites(devices: ObserviumDevice[]): Site[] {
 
 /**
  * Convert Observium ports to domain links
+ * Only uses real traffic data - no simulation or fallbacks
  */
 export function mapPortsToLinks(ports: ObserviumPort[]): Link[] {
   return ports.map(port => {
-    // Simulate utilization based on port status
-    // In a real implementation, this would use actual traffic data from counters
+    // Calculate utilization from real Observium data only
     let utilization = 0;
-    if (port.ifOperStatus === 'up') {
-      // Use the rate values if available, otherwise simulate
-      const inRate = parseFloat(port.ifInOctets_rate || '0');
-      const outRate = parseFloat(port.ifOutOctets_rate || '0');
-      const speed = parseFloat(port.ifSpeed || '0');
-      
-      if (speed > 0 && (inRate > 0 || outRate > 0)) {
-        // Calculate utilization as the higher of in/out rates divided by speed
-        utilization = Math.max(inRate, outRate) / speed * 100;
-      } else {
-        // Simulate random utilization between 20% and 90%
-        utilization = Math.floor(Math.random() * 70) + 20;
-      }
+    let capacity = 0;
+    let currentUsage = 0;
+
+    // Get capacity in Mbps
+    if (port.ifHighSpeed && Number(port.ifHighSpeed) > 0) {
+      capacity = Number(port.ifHighSpeed); // Already in Mbps
+    } else if (port.ifSpeed && Number(port.ifSpeed) > 0) {
+      capacity = Number(port.ifSpeed) / 1000000; // Convert from bps to Mbps
     }
-    
-    // Determine status based on utilization
+
+    // Only calculate utilization if we have real traffic rate data
+    // Use the _rate fields which contain octets per second, not cumulative counters
+    if (capacity > 0 && (port.ifInOctets_rate || port.ifOutOctets_rate)) {
+      // Convert octets per second to Mbps (8 bits per octet, 1,000,000 bits per Mbps)
+      const inMbps = (Number(port.ifInOctets_rate || 0) * 8) / 1000000;
+      const outMbps = (Number(port.ifOutOctets_rate || 0) * 8) / 1000000;
+
+      // Use the higher of input or output utilization
+      currentUsage = Math.max(inMbps, outMbps);
+      utilization = Math.min((currentUsage / capacity) * 100, 100); // Cap at 100%
+    }
+    // If no real traffic data available, utilization remains 0
+
+    // Determine status based on real utilization and operational status
     let status: 'normal' | 'warning' | 'critical' = 'normal';
-    if (utilization >= 80) {
+    if (port.ifOperStatus !== 'up') {
       status = 'critical';
-    } else if (utilization >= 60) {
+    } else if (utilization >= 85) {
+      status = 'critical';
+    } else if (utilization >= 70) {
       status = 'warning';
     }
-    
-    // Parse speed to Mbps
-    const speedRaw = parseFloat(port.ifSpeed || '0');
-    const capacity = speedRaw > 0 ? speedRaw / 1000000 : 100; // Convert to Mbps
-    
+
     return {
-      id: port.port_id,
-      siteId: port.device_id || '',
-      name: port.ifName || port.port_label || `Port ${port.port_id}`,
+      id: port.port_id.toString(),
+      siteId: port.device_id?.toString() || '',
+      name: port.ifName || port.ifAlias || `Port ${port.port_id}`,
       capacity,
-      currentUsage: (utilization * capacity) / 100,
-      utilizationPercentage: utilization,
+      currentUsage,
+      utilizationPercentage: Math.round(utilization * 100) / 100, // Round to 2 decimal places
       status,
-      lastUpdated: port.ifLastChange ? new Date(port.ifLastChange) : new Date(),
+      lastUpdated: port.poll_time ? new Date(Number(port.poll_time) * 1000) : new Date(),
     };
   });
 }
@@ -188,8 +197,8 @@ export function mapPortsToLinks(ports: ObserviumPort[]): Link[] {
 export function mapObserviumAlertsToDomainAlerts(alerts: ObserviumAlert[]): Alert[] {
   return alerts.map(alert => ({
     id: alert.alert_table_id,
-    siteId: alert.device_id,
-    linkId: alert.entity_type === 'port' ? alert.entity_id : undefined,
+    siteId: alert.device_id.toString(),
+    linkId: alert.entity_type === 'port' ? alert.entity_id.toString() : undefined,
     type: mapAlertType(alert.entity_type),
     severity: mapAlertSeverity(alert.severity),
     message: alert.last_message || 'Unknown alert',
@@ -197,3 +206,5 @@ export function mapObserviumAlertsToDomainAlerts(alerts: ObserviumAlert[]): Aler
     acknowledged: alert.alert_status !== '0',
   }));
 }
+
+

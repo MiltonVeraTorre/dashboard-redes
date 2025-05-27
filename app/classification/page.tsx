@@ -3,41 +3,141 @@
 import React, { useState } from 'react';
 import { SiteStatusChart } from '@/app/_components/site-status-chart';
 import { SiteTrendChart } from '@/app/_components/site-trend-chart';
+import { IncreasingSaturationTrends } from '@/app/_components/IncreasingSaturationTrends';
+import { useCachedFetch } from '@/lib/hooks/useCachedFetch';
+import { Plaza, Alert } from '@/lib/domain/entities';
+
+// Define types for our data
+interface SiteData {
+  id: string;
+  name: string;
+  plaza?: string;
+  saturation: number;
+  trend: 'up' | 'down' | 'stable';
+  outages: number;
+  lastOutage?: string;
+  previousSaturation?: number;
+  status?: 'normal' | 'warning' | 'critical';
+}
+
+interface NetworkOverview {
+  totalSites: number;
+  sitesPerPlaza: Record<Plaza, number>;
+  criticalSites: number;
+  averageUtilization: number;
+  utilizationByPlaza: Record<Plaza, number>;
+  recentAlerts: Alert[];
+}
 
 export default function ClassificationPage() {
   const [timeRange, setTimeRange] = useState("7d");
   const [activeTab, setActiveTab] = useState("status");
 
-  const mostSaturatedSites = [
-    { id: 1, name: "CDMX-Norte-01", saturation: 95, trend: "up", outages: 3 },
-    { id: 2, name: "MTY-Centro-03", saturation: 86, trend: "up", outages: 1 },
-    { id: 3, name: "QRO-Terras-04", saturation: 78, trend: "stable", outages: 0 },
-    { id: 4, name: "GDL-Sur-02", saturation: 72, trend: "up", outages: 2 },
-    { id: 5, name: "CDMX-Sur-06", saturation: 68, trend: "down", outages: 0 },
-  ];
+  // Use cached fetch for network overview data
+  const {
+    data: networkData,
+    loading: networkLoading,
+    error: networkError,
+    refetch: refetchNetwork
+  } = useCachedFetch<NetworkOverview>(
+    '/api/monitoring/network-overview',
+    {
+      ttl: 5 * 60 * 1000, // 5 minutes cache
+      enabled: true
+    }
+  );
 
-  const sitesWithMostOutages = [
-    { id: 6, name: "PUE-Industrial-02", outages: 7, lastOutage: "2025-05-21", saturation: 65 },
-    { id: 7, name: "VER-Puerto-01", outages: 5, lastOutage: "2025-05-20", saturation: 62 },
-    { id: 1, name: "CDMX-Norte-01", outages: 3, lastOutage: "2025-05-22", saturation: 95 },
-    { id: 8, name: "LEO-Centro-03", outages: 3, lastOutage: "2025-05-19", saturation: 58 },
-    { id: 4, name: "GDL-Sur-02", outages: 2, lastOutage: "2025-05-18", saturation: 72 },
-  ];
+  // Use cached fetch for saturated sites data
+  const {
+    data: saturatedSitesData,
+    loading: saturatedSitesLoading,
+    error: saturatedSitesError,
+    refetch: refetchSaturatedSites
+  } = useCachedFetch<{
+    status: string;
+    count: number;
+    sites: SiteData[];
+    metadata: {
+      limit: number;
+      includeHistory: boolean;
+      trendsOnly: boolean;
+      timestamp: string;
+      dataSource: string;
+      dataAvailability?: {
+        totalSitesFound: number;
+        sitesWithUtilizationData: boolean;
+        message?: string;
+      };
+    };
+  }>(
+    '/api/monitoring/saturated-sites?limit=5&includeHistory=true',
+    {
+      ttl: 2 * 60 * 1000, // 2 minutes cache
+      enabled: true
+    }
+  );
 
-  const sitesWithIncreasingTrend = [
-    { id: 1, name: "CDMX-Norte-01", saturation: 95, trend: 18, previousSaturation: 77 },
-    { id: 2, name: "MTY-Centro-03", saturation: 86, trend: 12, previousSaturation: 74 },
-    { id: 4, name: "GDL-Sur-02", saturation: 72, trend: 9, previousSaturation: 63 },
-    { id: 9, name: "QRO-Terras-04", saturation: 78, trend: 8, previousSaturation: 70 },
-    { id: 10, name: "MER-Centro-01", saturation: 65, trend: 7, previousSaturation: 58 },
-  ];
+  // Use the new saturated sites data if available, otherwise fallback to network overview data
+  const mostSaturatedSites: SiteData[] = saturatedSitesData?.sites ||
+    (networkData?.utilizationByPlaza
+      ? Object.entries(networkData.utilizationByPlaza)
+          .map(([plaza, utilization]) => {
+            return {
+              id: plaza,
+              name: plaza,
+              saturation: Math.round(utilization),
+              trend: (utilization > 70 ? 'up' : utilization < 30 ? 'down' : 'stable') as 'up' | 'down' | 'stable',
+              outages: networkData.recentAlerts.filter(alert => alert.siteId === plaza).length
+            };
+          })
+          .sort((a, b) => b.saturation - a.saturation)
+          .slice(0, 5)
+      : []);
+
+  const sitesWithMostOutages: SiteData[] = networkData?.recentAlerts
+    ? Object.entries(
+        networkData.recentAlerts.reduce((acc, alert) => {
+          acc[alert.siteId] = (acc[alert.siteId] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      )
+        .map(([siteId, outages]) => {
+          const lastAlert = networkData.recentAlerts.find(alert => alert.siteId === siteId);
+          return {
+            id: siteId,
+            name: siteId,
+            saturation: Math.round(networkData.utilizationByPlaza[siteId] || 0),
+            trend: 'stable' as 'up' | 'down' | 'stable',
+            outages,
+            lastOutage: lastAlert?.timestamp instanceof Date
+              ? lastAlert.timestamp.toISOString()
+              : new Date(lastAlert?.timestamp || '').toISOString()
+          };
+        })
+        .sort((a, b) => b.outages - a.outages)
+        .slice(0, 5)
+    : [];
+
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    await Promise.all([
+      refetchNetwork(),
+      refetchSaturatedSites()
+    ]);
+  };
+
+  // Combined loading state
+  const isLoading = networkLoading || saturatedSitesLoading;
+
+  // Combined error state
+  const hasError = networkError || saturatedSitesError;
+  const errorMessage = networkError || saturatedSitesError;
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-100 text-gray-800">
       {/* Header */}
       <header className="border-b border-gray-300 bg-white">
         <div className="flex h-14 items-center px-4">
-          
           <div className="ml-auto flex items-center gap-4">
             <div className="relative">
               <svg
@@ -59,11 +159,22 @@ export default function ClassificationPage() {
                 className="h-9 w-64 rounded-md border border-gray-300 bg-white pl-8 text-sm outline-none focus:border-gray-500"
               />
             </div>
-            <button className="rounded-md border border-gray-300 p-1.5 hover:bg-gray-50">
-              <svg width="20" height="20" viewBox="0 0 15 15" fill="none">
+            <button
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="rounded-md border border-gray-300 p-1.5 hover:bg-gray-50"
+            >
+              <svg
+                className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path
-                  d="M1.5 3C1.22386 3 1 3.22386 1 3.5C1 3.77614 1.22386 4 1.5 4H13.5C13.7761 4 14 3.77614 14 3.5C14 3.22386 13.7761 3 13.5 3H1.5ZM1.5 7C1.22386 7 1 7.22386 1 7.5C1 7.77614 1.22386 8 1.5 8H13.5C13.7761 8 14 7.77614 14 7.5C14 7.22386 13.7761 7 13.5 7H1.5ZM1 11.5C1 11.2239 1.22386 11 1.5 11H13.5C13.7761 11 14 11.2239 14 11.5C14 11.7761 13.7761 12 13.5 12H1.5C1.22386 12 1 11.7761 1 11.5Z"
-                  fill="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
             </button>
@@ -72,7 +183,6 @@ export default function ClassificationPage() {
       </header>
 
       <div className="flex flex-1">
-
         {/* Main Content */}
         <main className="flex-1 p-6">
           <div className="mb-6 flex items-center justify-between">
@@ -84,28 +194,114 @@ export default function ClassificationPage() {
             </div>
           </div>
 
+          {/* Error Display */}
+          {hasError && (
+            <div className="mb-6 rounded-md bg-red-50 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Error al cargar datos</h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{errorMessage}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {isLoading && (
+            <div className="mb-6 flex items-center justify-center rounded-md bg-gray-50 p-4">
+              <svg className="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="ml-2 text-sm text-gray-600">Cargando datos de sitios saturados...</span>
+            </div>
+          )}
+
           {/* Main Grid */}
           <div className="grid gap-6 md:grid-cols-2">
             {/* Most Saturated Sites */}
             <div className="rounded-md border border-gray-300 bg-white p-4">
-              <h3 className="mb-4 text-lg font-normal">Sitios Más Saturados</h3>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-normal">Sitios Más Saturados</h3>
+                {saturatedSitesData && (
+                  <span className="text-xs text-gray-500">
+                    Actualizado: {new Date(saturatedSitesData.metadata?.timestamp || '').toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
               <div className="space-y-4">
-                {mostSaturatedSites.map((site) => (
-                  <div key={site.id} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-normal">{site.name}</span>
-                      <span className="font-normal">{site.saturation}%</span>
+                {mostSaturatedSites.length > 0 ? (
+                  mostSaturatedSites.map((site: SiteData) => (
+                    <div key={site.id} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="font-normal">{site.name}</span>
+                          {site.plaza && site.plaza !== site.name && (
+                            <span className="text-xs text-gray-500">Plaza: {site.plaza}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {site.trend === 'up' && (
+                            <svg className="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                          )}
+                          {site.trend === 'down' && (
+                            <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                            </svg>
+                          )}
+                          <span className="font-normal">{site.saturation}%</span>
+                        </div>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-gray-200">
+                        <div
+                          className={`h-2 rounded-full ${
+                            site.saturation >= 85 ? "bg-red-600" : site.saturation >= 70 ? "bg-yellow-500" : "bg-green-500"
+                          }`}
+                          style={{ width: `${Math.min(site.saturation, 100)}%` }}
+                        ></div>
+                      </div>
+                      {site.previousSaturation && (
+                        <div className="text-xs text-gray-500">
+                          Anterior: {site.previousSaturation}% → Cambio: {site.saturation - site.previousSaturation > 0 ? '+' : ''}{site.saturation - site.previousSaturation}%
+                        </div>
+                      )}
                     </div>
-                    <div className="h-2 w-full rounded-full bg-gray-200">
-                      <div
-                        className={`h-2 rounded-full ${
-                          site.saturation >= 85 ? "bg-gray-800" : site.saturation >= 70 ? "bg-gray-600" : "bg-gray-400"
-                        }`}
-                        style={{ width: `${site.saturation}%` }}
-                      ></div>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    {saturatedSitesData?.metadata?.dataAvailability?.message ? (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                        <div className="flex">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-yellow-800">Datos de utilización no disponibles</h3>
+                            <div className="mt-2 text-sm text-yellow-700">
+                              <p>{saturatedSitesData.metadata.dataAvailability.message}</p>
+                              <p className="mt-1">Sitios encontrados: {saturatedSitesData.metadata.dataAvailability.totalSitesFound}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500">
+                        No hay datos de sitios saturados disponibles
+                      </div>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -113,7 +309,7 @@ export default function ClassificationPage() {
             <div className="rounded-md border border-gray-300 bg-white p-4">
               <h3 className="mb-4 text-lg font-normal">Sitios con Más Caídas</h3>
               <div className="space-y-4">
-                {sitesWithMostOutages.map((site) => (
+                {sitesWithMostOutages.map((site: SiteData) => (
                   <div key={site.id} className="flex items-center justify-between border-b border-gray-200 pb-3">
                     <div>
                       <div className="font-normal">{site.name}</div>
@@ -126,103 +322,17 @@ export default function ClassificationPage() {
             </div>
           </div>
 
-          {/* Sites with Increasing Trend */}
-          <div className="mt-6 rounded-md border border-gray-300 bg-white p-4">
-            <h3 className="mb-4 text-lg font-normal">Sitios con Tendencia Creciente</h3>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {sitesWithIncreasingTrend.map((site) => (
-                <div key={site.id} className="rounded-md border border-gray-300 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-normal">{site.name}</span>
-                    <span className="text-sm">+{site.trend}%</span>
-                  </div>
-                  <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
-                    <div
-                      className={`h-2 rounded-full ${
-                        site.saturation >= 85 ? "bg-gray-800" : site.saturation >= 70 ? "bg-gray-600" : "bg-gray-400"
-                      }`}
-                      style={{ width: `${site.saturation}%` }}
-                    ></div>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
-                    <span>Anterior: {site.previousSaturation}%</span>
-                    <span>Actual: {site.saturation}%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Tabs Section */}
+          {/* Sites with Increasing Saturation Trends - Enhanced Component */}
           <div className="mt-6">
-            <div className="flex items-center justify-between">
-              <div className="border-b border-gray-300">
-                <div className="flex">
-                  <button
-                    onClick={() => setActiveTab("status")}
-                    className={`px-4 py-2 text-sm font-normal border-b-2 ${
-                      activeTab === "status"
-                        ? "border-gray-800 text-gray-900"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    Tendencias de Utilización
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("trends")}
-                    className={`px-4 py-2 text-sm font-normal border-b-2 ${
-                      activeTab === "trends"
-                        ? "border-gray-800 text-gray-900"
-                        : "border-transparent text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    Análisis de Latencia
-                  </button>
-                </div>
-              </div>
-              <button className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50">
-                <svg className="mr-2 inline h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-                  />
-                </svg>
-                Opciones
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            {activeTab === "status" && (
-              <div className="mt-4 rounded-md border border-gray-300 bg-white p-4">
-                <div className="h-[300px]">
-                  <SiteStatusChart />
-                </div>
-              </div>
-            )}
-
-            {activeTab === "trends" && (
-              <div className="mt-4 rounded-md border border-gray-300 bg-white p-4">
-                <div className="h-[300px]">
-                  <SiteTrendChart />
-                </div>
-              </div>
-            )}
+            <IncreasingSaturationTrends
+              limit={5}
+              onRefresh={handleRefresh}
+            />
           </div>
 
-          {/* Pagination */}
-          <div className="mt-6 flex items-center justify-between rounded-md border border-gray-300 bg-white p-4">
-            <span className="text-sm text-gray-500">Mostrando 1 a 5 de 135 sitios</span>
-            <div className="flex items-center gap-2">
-              <button className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50">Anterior</button>
-              <button className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50">
-                Siguiente
-              </button>
-            </div>
-          </div>
+
         </main>
       </div>
     </div>
   );
-} 
+}

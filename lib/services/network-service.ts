@@ -186,7 +186,7 @@ export async function fetchCriticalSites(limit: number = 5) {
 
 /**
  * Fetch network consumption by plaza over time
- * This provides data for the "Consumo de Red por Plaza" chart
+ * Only uses real historical data from Observium - throws error if unavailable
  */
 export async function fetchNetworkConsumptionByPlaza(): Promise<{
   plazas: Plaza[];
@@ -214,45 +214,11 @@ export async function fetchNetworkConsumptionByPlaza(): Promise<{
 
   try {
     console.log('Fetching fresh network consumption data');
-    // Fetch devices to get plazas
-    const devices = await fetchDevices();
-    const sites = mapDevicesToSites(devices);
 
-    // Get unique plazas
-    const plazas = Array.from(new Set(sites.map(site => site.plaza)));
+    // TODO: Implement real historical data fetching from Observium
+    // This would require additional API endpoints for historical consumption data
+    throw new Error('Historical network consumption data is not yet available from Observium API. This feature requires implementation of historical data endpoints.');
 
-    // For each plaza, simulate consumption data over time
-    // In a real implementation, this would fetch historical data from Observium
-    const data = plazas.map(plaza => {
-      // Generate 7 data points (e.g., for the last 7 days)
-      const values = Array.from({ length: 7 }, () => {
-        // Random value between 20 and 90
-        return Math.floor(Math.random() * 70) + 20;
-      });
-
-      // Generate timestamps (last 7 days)
-      const timestamps = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (6 - i)); // Start from 6 days ago
-        return date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-      });
-
-      return {
-        plaza,
-        values,
-        timestamps
-      };
-    });
-
-    const result = {
-      plazas,
-      data
-    };
-
-    // Cache the result
-    cacheService.set(cacheKey, result, CACHE_TTL.CONSUMPTION_TRENDS);
-
-    return result;
   } catch (error) {
     console.error('Error fetching network consumption by plaza:', error);
     throw error;
@@ -337,7 +303,7 @@ export async function fetchCapacityUtilizationByPlaza(): Promise<{
 
 /**
  * Fetch growth trends data
- * This provides data for the "Tendencias de Crecimiento" chart
+ * Only uses real historical data from Observium - throws error if unavailable
  */
 export async function fetchGrowthTrends(): Promise<{
   months: string[];
@@ -358,25 +324,10 @@ export async function fetchGrowthTrends(): Promise<{
   try {
     console.log('Fetching fresh growth trends data');
 
-    // In a real implementation, this would fetch historical data from Observium
-    // For now, we'll simulate growth data for the last 4 months
-    const months = ['Mar', 'Apr', 'May', 'Jun'];
+    // TODO: Implement real historical growth data fetching from Observium
+    // This would require additional API endpoints for historical growth trends
+    throw new Error('Historical growth trends data is not yet available from Observium API. This feature requires implementation of historical data endpoints.');
 
-    // Simulate increasing trend
-    const values = [40, 55, 65, 80];
-
-    const result = {
-      months,
-      values
-    };
-
-    // Cache the result
-    cacheService.set<{
-      months: string[];
-      values: number[];
-    }>(cacheKey, result, CACHE_TTL.CONSUMPTION_TRENDS);
-
-    return result;
   } catch (error) {
     console.error('Error fetching growth trends:', error);
     throw error;

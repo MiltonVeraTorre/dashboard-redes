@@ -2,12 +2,11 @@
  * Sites Domain Layer
  *
  * This module contains the business logic for site management and monitoring.
- * Integrates with Observium API for real network data while maintaining
- * fallback to mock data for development.
+ * Integrates with Observium API for real network data only.
+ * No fallback to mock data - errors are thrown when API is unavailable.
  */
 
 import { Site, Link } from './entities';
-import { getSites as getRepositorySites, getLinks } from '../repositories/metrics';
 import * as ObserviumAdapter from '../adapters/ObserviumApiAdapter';
 
 export interface SitesDomain {
@@ -18,37 +17,30 @@ export interface SitesDomain {
 export interface GetSitesOptions {
   plaza?: string;
   limit?: number;
-  useRealData?: boolean; // Flag to use Observium vs mock data
 }
 
 /**
  * Get sites with optional filtering
- * Integrates with Observium API for real data
+ * Only uses real data from Observium API - throws errors if API is unavailable
  */
 export async function getSites(options: GetSitesOptions = {}): Promise<Site[]> {
-  const { plaza, limit, useRealData = true } = options;
+  const { plaza, limit } = options;
 
   try {
     let sites: Site[];
 
-    if (useRealData) {
-      // Try to get real data from Observium
-      if (plaza) {
-        // Use plaza-specific method for better performance
-        const observiumDevices = await ObserviumAdapter.fetchDevicesByPlaza(plaza);
-        sites = observiumDevices.map(device => ({
-          id: device.device_id.toString(),
-          name: device.hostname,
-          plaza: device.group || device.location || 'Unknown',
-          address: device.location,
-        }));
-      } else {
-        // Get all sites from Observium
-        sites = await ObserviumAdapter.fetchSites();
-      }
+    if (plaza) {
+      // Use plaza-specific method for better performance
+      const observiumDevices = await ObserviumAdapter.fetchDevicesByPlaza(plaza);
+      sites = observiumDevices.map(device => ({
+        id: device.device_id.toString(),
+        name: device.hostname,
+        plaza: device.group || device.location || 'Unknown',
+        address: device.location,
+      }));
     } else {
-      // Fallback to repository (mock data)
-      sites = await getRepositorySites({ plaza });
+      // Get all sites from Observium
+      sites = await ObserviumAdapter.fetchSites();
     }
 
     // Apply limit if specified
@@ -58,112 +50,81 @@ export async function getSites(options: GetSitesOptions = {}): Promise<Site[]> {
 
     return sites;
   } catch (error) {
-    console.warn('Failed to fetch sites from Observium, falling back to mock data:', error);
-
-    // Fallback to mock data if Observium fails
-    let sites = await getRepositorySites({ plaza });
-
-    if (limit && limit > 0) {
-      sites = sites.slice(0, limit);
-    }
-
-    return sites;
+    console.error('Failed to fetch sites from Observium API:', error);
+    throw new Error(`Unable to fetch sites from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
  * Get a site with its associated links
- * Integrates with Observium API for real monitoring data
+ * Only uses real data from Observium API - throws errors if API is unavailable
  */
-export async function getSiteWithLinks(siteId: string, useRealData: boolean = true): Promise<{ site: Site; links: Link[] } | null> {
+export async function getSiteWithLinks(siteId: string): Promise<{ site: Site; links: Link[] } | null> {
   try {
-    if (useRealData) {
-      // Try to get real data from Observium
-      const deviceId = parseInt(siteId);
+    const deviceId = parseInt(siteId);
 
-      if (isNaN(deviceId)) {
-        // If siteId is not a number, fall back to mock data
-        return getSiteWithLinksFromRepository(siteId);
-      }
-
-      // Get comprehensive monitoring data from Observium
-      const monitoringData = await ObserviumAdapter.fetchDeviceMonitoringData(deviceId);
-
-      if (!monitoringData.device) {
-        return null;
-      }
-
-      // Transform Observium device to Site entity
-      const site: Site = {
-        id: monitoringData.device.device_id.toString(),
-        name: monitoringData.device.hostname,
-        plaza: monitoringData.device.group || monitoringData.device.location || 'Unknown',
-        address: monitoringData.device.location,
-      };
-
-      // Transform Observium ports to Link entities
-      const links: Link[] = monitoringData.ports.map(port => {
-        const capacity = port.ifHighSpeed ? port.ifHighSpeed : (port.ifSpeed ? port.ifSpeed / 1000000 : 0);
-        const currentUsage = calculateCurrentUsage(port);
-        const utilizationPercentage = capacity > 0 ? Math.min((currentUsage / capacity) * 100, 100) : 0;
-
-        return {
-          id: port.port_id.toString(),
-          siteId: port.device_id.toString(),
-          name: port.ifAlias || port.ifName,
-          capacity: capacity,
-          currentUsage: currentUsage,
-          utilizationPercentage: utilizationPercentage,
-          status: determinePortStatus(utilizationPercentage, port.ifOperStatus),
-          lastUpdated: port.poll_time ? new Date(port.poll_time) : new Date(),
-        };
-      });
-
-      return { site, links };
-    } else {
-      // Use mock data
-      return getSiteWithLinksFromRepository(siteId);
+    if (isNaN(deviceId)) {
+      throw new Error(`Invalid site ID: ${siteId}. Site ID must be a numeric device ID from Observium.`);
     }
+
+    // Get comprehensive monitoring data from Observium
+    const monitoringData = await ObserviumAdapter.fetchDeviceMonitoringData(deviceId);
+
+    if (!monitoringData.device) {
+      return null;
+    }
+
+    // Transform Observium device to Site entity
+    const site: Site = {
+      id: monitoringData.device.device_id.toString(),
+      name: monitoringData.device.hostname,
+      plaza: monitoringData.device.group || monitoringData.device.location || 'Unknown',
+      address: monitoringData.device.location,
+    };
+
+    // Transform Observium ports to Link entities
+    const links: Link[] = monitoringData.ports.map(port => {
+      const capacity = port.ifHighSpeed ? Number(port.ifHighSpeed) : (port.ifSpeed ? Number(port.ifSpeed) / 1000000 : 0);
+      const currentUsage = calculateCurrentUsage(port);
+      const utilizationPercentage = capacity > 0 ? Math.min((currentUsage / capacity) * 100, 100) : 0;
+
+      return {
+        id: port.port_id.toString(),
+        siteId: port.device_id.toString(),
+        name: port.ifAlias || port.ifName,
+        capacity: capacity,
+        currentUsage: currentUsage,
+        utilizationPercentage: utilizationPercentage,
+        status: determinePortStatus(utilizationPercentage, port.ifOperStatus),
+        lastUpdated: port.poll_time ? new Date(port.poll_time) : new Date(),
+      };
+    });
+
+    return { site, links };
   } catch (error) {
-    console.warn(`Failed to fetch site ${siteId} from Observium, falling back to mock data:`, error);
-
-    // Fallback to mock data if Observium fails
-    return getSiteWithLinksFromRepository(siteId);
+    console.error(`Failed to fetch site ${siteId} from Observium API:`, error);
+    throw new Error(`Unable to fetch site ${siteId} from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-}
-
-/**
- * Helper function to get site with links from repository (mock data)
- */
-async function getSiteWithLinksFromRepository(siteId: string): Promise<{ site: Site; links: Link[] } | null> {
-  // Get all sites from repository
-  const sites = await getRepositorySites();
-
-  // Find the requested site
-  const site = sites.find(s => s.id === siteId);
-  if (!site) {
-    return null;
-  }
-
-  // Get links for this site
-  const links = await getLinks({ siteId });
-
-  return { site, links };
 }
 
 /**
  * Calculate current usage from Observium port statistics
- * Uses the higher of input or output octets per second
+ * Uses actual traffic rate data from Observium (ifInOctets_rate/ifOutOctets_rate)
+ * Returns 0 if no real traffic data is available
  */
 function calculateCurrentUsage(port: ObserviumAdapter.ObserviumPort): number {
-  // This is a simplified calculation
-  // In a real implementation, you would need rate data or calculate from deltas
-  const inOctetsPerSec = port.ifInOctets || 0;
-  const outOctetsPerSec = port.ifOutOctets || 0;
+  // Use the rate fields which contain octets per second, not cumulative counters
+  const inOctetsRate = Number(port.ifInOctets_rate || 0);
+  const outOctetsRate = Number(port.ifOutOctets_rate || 0);
+
+  // If no traffic rate data is available, return 0
+  if (inOctetsRate === 0 && outOctetsRate === 0) {
+    return 0;
+  }
 
   // Convert octets per second to Mbps (8 bits per octet, 1,000,000 bits per Mbps)
-  const inMbps = (inOctetsPerSec * 8) / 1000000;
-  const outMbps = (outOctetsPerSec * 8) / 1000000;
+  const inMbps = (inOctetsRate * 8) / 1000000;
+  const outMbps = (outOctetsRate * 8) / 1000000;
 
   // Return the higher utilization
   return Math.max(inMbps, outMbps);

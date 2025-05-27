@@ -134,27 +134,19 @@ export async function GET(
       return NextResponse.json(response);
 
     } catch (error) {
-      console.warn(`⚠️ Failed to fetch real data for plaza ${plaza}, using fallback:`, error);
+      console.error(`❌ Failed to fetch trends data for plaza ${plaza}:`, error);
 
-      // Fallback to generated data if real data fails
-      const fallbackTrends = generateFallbackTrends(plaza, period);
-      const summary = calculateTrendsSummary(fallbackTrends);
-
-      const fallbackResponse = {
-        plaza,
-        period,
-        interval,
-        trends: fallbackTrends,
-        summary,
-        fallback: true,
-        warning: 'Using generated data due to API unavailability',
-        timestamp: new Date().toISOString()
-      };
-
-      // Cache fallback data for shorter time (1 minute)
-      cacheService.set(cacheKey, fallbackResponse, 1 * 60 * 1000);
-
-      return NextResponse.json(fallbackResponse);
+      // Return proper error response instead of fallback data
+      return NextResponse.json(
+        {
+          error: `Failed to fetch trends data for plaza ${plaza}`,
+          message: error instanceof Error ? error.message : 'Unknown error',
+          plaza,
+          period,
+          timestamp: new Date().toISOString()
+        },
+        { status: 503 } // Service Unavailable
+      );
     }
 
   } catch (error) {
@@ -201,35 +193,4 @@ function calculateTrendsSummary(trends: Array<{ date: string; utilizacion: numbe
   };
 }
 
-/**
- * Generate fallback trends data when real data is unavailable
- */
-function generateFallbackTrends(plaza: string, period: string) {
-  const plazaSeeds: Record<string, number> = {
-    'Laredo': 1,
-    'Saltillo': 2,
-    'CDMX': 3,
-    'Monterrey': 4
-  };
 
-  const seed = plazaSeeds[plaza] || 1;
-  const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
-  const trends = [];
-
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-
-    // Generate different patterns for each plaza
-    const variation = Math.sin((i + seed) * 0.8) * 20 + (seed * 5);
-    const baseUtilization = 50 + (seed * 10);
-    const utilizacion = Math.max(20, Math.min(90, baseUtilization + variation));
-
-    trends.push({
-      date: date.toISOString().split('T')[0],
-      utilizacion: Math.round(utilizacion)
-    });
-  }
-
-  return trends;
-}

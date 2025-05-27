@@ -39,7 +39,7 @@ export const NetworkService = {
         return response.data;
       } catch (error) {
         console.error('Error fetching network devices from Observium:', error);
-        return [];
+        throw new Error(`Unable to fetch network devices from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
 
@@ -52,7 +52,7 @@ export const NetworkService = {
         return response.data;
       } catch (error) {
         console.error(`Error fetching network device ${deviceId} from Observium:`, error);
-        return null;
+        throw new Error(`Unable to fetch network device ${deviceId} from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
 
@@ -65,7 +65,7 @@ export const NetworkService = {
         return response.data;
       } catch (error) {
         console.error(`Error fetching network stats for device ${deviceId} from Observium:`, error);
-        return null;
+        throw new Error(`Unable to fetch network statistics for device ${deviceId} from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
 
@@ -78,7 +78,7 @@ export const NetworkService = {
         return response.data;
       } catch (error) {
         console.error(`Error updating network device ${deviceId} in Observium:`, error);
-        return null;
+        throw new Error(`Unable to update network device ${deviceId} in Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
   },

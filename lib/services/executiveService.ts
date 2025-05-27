@@ -1,6 +1,6 @@
 /**
  * Executive Dashboard Service
- * 
+ *
  * This service provides methods for fetching data for the executive dashboard
  * using the specialized API clients for Observium and PRTG.
  */
@@ -14,32 +14,16 @@ import { NetworkOverview } from '../domain/entities';
  */
 export const ExecutiveService = {
   /**
-   * Get network overview data from both Observium and PRTG
+   * Get network overview data from Observium only
+   * No fallback to PRTG - throws error if Observium is unavailable
    */
   getNetworkOverview: async (): Promise<NetworkOverview> => {
     try {
-      // First try to get data from Observium
-      try {
-        const response = await observiumApi.get<NetworkOverview>('/api/overview');
-        return response.data;
-      } catch (observiumError) {
-        console.error('Error fetching overview from Observium, falling back to PRTG:', observiumError);
-        
-        // If Observium fails, try PRTG
-        const response = await prtgApi.get<NetworkOverview>('/api/overview');
-        return response.data;
-      }
+      const response = await observiumApi.get<NetworkOverview>('/api/overview');
+      return response.data;
     } catch (error) {
-      console.error('Error fetching network overview data:', error);
-      // Return a default empty overview if both APIs fail
-      return {
-        totalSites: 0,
-        sitesPerPlaza: {},
-        criticalSites: 0,
-        averageUtilization: 0,
-        utilizationByPlaza: {},
-        recentAlerts: []
-      };
+      console.error('Error fetching network overview from Observium API:', error);
+      throw new Error(`Unable to fetch network overview from Observium API: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 };

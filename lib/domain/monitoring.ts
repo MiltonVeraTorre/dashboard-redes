@@ -240,10 +240,24 @@ export function requiresAttention(monitoringData: DeviceMonitoringData): {
     const capacity = port.ifHighSpeed || (port.ifSpeed ? port.ifSpeed / 1000000 : 0);
     if (capacity === 0) return false;
 
-    const inMbps = ((port.ifInOctets || 0) * 8) / 1000000;
-    const outMbps = ((port.ifOutOctets || 0) * 8) / 1000000;
-    const utilization = Math.max(inMbps, outMbps) / capacity * 100;
+    // Try to use rate fields for proper utilization calculation
+    let currentUsage = 0;
+    const portData = port as any;
 
+    if (portData.ifInOctets_rate !== undefined && portData.ifOutOctets_rate !== undefined) {
+      // These are in octets/bytes per second according to Observium docs
+      const inMbps = ((portData.ifInOctets_rate || 0) * 8) / 1000000;
+      const outMbps = ((portData.ifOutOctets_rate || 0) * 8) / 1000000;
+      currentUsage = Math.max(inMbps, outMbps);
+    } else if (portData.in_rate !== undefined && portData.out_rate !== undefined) {
+      const inMbps = ((portData.in_rate || 0) * 8) / 1000000;
+      const outMbps = ((portData.out_rate || 0) * 8) / 1000000;
+      currentUsage = Math.max(inMbps, outMbps);
+    }
+
+    if (currentUsage === 0) return false; // No rate data available
+
+    const utilization = Math.min((currentUsage / capacity) * 100, 100); // Cap at 100%
     return utilization >= 75;
   });
 
@@ -387,15 +401,28 @@ export async function getPlazaCapacitySummary(plaza: string): Promise<{
 
     ports.forEach(port => {
       const capacity = port.ifHighSpeed || (port.ifSpeed ? port.ifSpeed / 1000000 : 0);
-      const inMbps = ((port.ifInOctets || 0) * 8) / 1000000;
-      const outMbps = ((port.ifOutOctets || 0) * 8) / 1000000;
-      const currentUsage = Math.max(inMbps, outMbps);
+
+      // Try to use rate fields for proper utilization calculation
+      let currentUsage = 0;
+      const portData = port as any;
+
+      if (portData.ifInOctets_rate !== undefined && portData.ifOutOctets_rate !== undefined) {
+        // These are in octets/bytes per second according to Observium docs
+        const inMbps = ((portData.ifInOctets_rate || 0) * 8) / 1000000;
+        const outMbps = ((portData.ifOutOctets_rate || 0) * 8) / 1000000;
+        currentUsage = Math.max(inMbps, outMbps);
+      } else if (portData.in_rate !== undefined && portData.out_rate !== undefined) {
+        const inMbps = ((portData.in_rate || 0) * 8) / 1000000;
+        const outMbps = ((portData.out_rate || 0) * 8) / 1000000;
+        currentUsage = Math.max(inMbps, outMbps);
+      }
+      // If no rate data available, currentUsage remains 0
 
       totalCapacity += capacity;
       usedCapacity += currentUsage;
 
-      if (capacity > 0) {
-        const utilization = (currentUsage / capacity) * 100;
+      if (capacity > 0 && currentUsage > 0) {
+        const utilization = Math.min((currentUsage / capacity) * 100, 100); // Cap at 100%
         if (utilization >= 90) {
           criticalLinks++;
         } else if (utilization >= 75) {

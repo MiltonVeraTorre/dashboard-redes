@@ -70,7 +70,7 @@ function processObserviumData(
   });
 
   // Count critical sites (devices with status down)
-  const criticalSites = devicesList.filter((device: any) => 
+  const criticalSites = devicesList.filter((device: any) =>
     device.status === 'down'
   ).length;
 
@@ -78,21 +78,30 @@ function processObserviumData(
   const ports = portsData.ports || {};
   const portsList = Object.values(ports) as any[];
 
-  // Create links from ports
+  // Create links from ports using real traffic data only
   const links: Link[] = portsList.map((port: any) => {
-    // Simulate utilization based on port status
-    // In a real implementation, this would use actual traffic data from counters
+    // Calculate real utilization from traffic counters
+    const capacity = parseInt(port.ifSpeed) / 1000000 || 0; // Convert to Mbps
+    let currentUsage = 0;
     let utilization = 0;
-    if (port.ifOperStatus === 'up') {
-      // Simulate random utilization between 20% and 90%
-      utilization = Math.floor(Math.random() * 70) + 20;
-    }
 
-    // Determine status based on utilization
+    // Use actual traffic counter data if available
+    if (port.ifInOctets && port.ifOutOctets && capacity > 0) {
+      // Convert octets to Mbps (8 bits per octet, 1,000,000 bits per Mbps)
+      const inMbps = (port.ifInOctets * 8) / 1000000;
+      const outMbps = (port.ifOutOctets * 8) / 1000000;
+      currentUsage = Math.max(inMbps, outMbps);
+      utilization = (currentUsage / capacity) * 100;
+    }
+    // If no traffic data available, utilization remains 0
+
+    // Determine status based on real utilization and operational status
     let status: 'normal' | 'warning' | 'critical' = 'normal';
-    if (utilization >= 80) {
+    if (port.ifOperStatus !== 'up') {
       status = 'critical';
-    } else if (utilization >= 60) {
+    } else if (utilization >= 85) {
+      status = 'critical';
+    } else if (utilization >= 70) {
       status = 'warning';
     }
 
@@ -100,9 +109,9 @@ function processObserviumData(
       id: port.port_id,
       siteId: port.device_id,
       name: port.ifName || `Port ${port.port_id}`,
-      capacity: parseInt(port.ifSpeed) / 1000000 || 100, // Convert to Mbps
-      currentUsage: (utilization * parseInt(port.ifSpeed) / 1000000) / 100 || 0,
-      utilizationPercentage: utilization,
+      capacity: capacity,
+      currentUsage: currentUsage,
+      utilizationPercentage: Math.round(utilization),
       status,
       lastUpdated: new Date(),
     };
