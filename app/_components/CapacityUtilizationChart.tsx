@@ -150,7 +150,21 @@ export function CapacityUtilizationChart({ height = 300, includeDetails = false 
 
   return (
     <div className="h-full">
-      <ResponsiveContainer width="100%" height={height}>
+      {/* Data Source Indicator */}
+      <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${isDemo ? 'bg-orange-400' : 'bg-green-400'}`}></div>
+          <span>
+            {dataSource === 'observium_data' ? 'Datos en tiempo real de Observium' :
+             dataSource === 'observium_api_empty' ? 'Sin datos en Observium' :
+             dataSource === 'demo_data' ? 'Datos de demostración' :
+             'Fuente desconocida'}
+          </span>
+        </div>
+        <span>Actualizado: {new Date(lastUpdated).toLocaleTimeString('es-ES')}</span>
+      </div>
+
+      <ResponsiveContainer width="100%" height={height - 30}>
         <BarChart
           data={data}
           margin={{
