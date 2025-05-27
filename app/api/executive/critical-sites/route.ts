@@ -183,44 +183,48 @@ export async function GET(request: NextRequest) {
 
       console.log(`🔍 Analyzing site ${site} with ${siteDevices.length} devices`);
 
-      // Get ports for site devices (limited to prevent large responses)
+      // Get ports with real utilization data (using percentage fields)
       let totalUtilization = 0;
       let portCount = 0;
       let utilizationSum = 0;
+      let criticalPorts = 0;
 
       try {
-        const portsResponse = await observiumApi.get('/ports', {
-          params: {
-            device_id: deviceIds.slice(0, 10), // Limit to first 10 devices
-            fields: 'port_id,device_id,ifOperStatus,ifSpeed,ifHighSpeed,ifInOctets_rate,ifOutOctets_rate',
-            state: 'up', // Only operational ports
-            pagesize: 30 // Limit ports per site
-          }
-        });
-
-        if (portsResponse.data && portsResponse.data.ports) {
-          const ports = Object.values(portsResponse.data.ports) as any[];
-          portCount = ports.length;
-
-          ports.forEach((port: any) => {
-            const speedMbps = port.ifHighSpeed
-              ? parseFloat(port.ifHighSpeed)
-              : port.ifSpeed
-                ? parseFloat(port.ifSpeed) / 1000000
-                : 0;
-
-            if (speedMbps > 0) {
-              const inRate = parseFloat(port.ifInOctets_rate) || 0;
-              const outRate = parseFloat(port.ifOutOctets_rate) || 0;
-              const currentUtilizationMbps = ((inRate + outRate) * 8) / 1000000;
-              const portUtilization = (currentUtilizationMbps / speedMbps) * 100;
-
-              utilizationSum += Math.min(portUtilization, 100);
+        // Process devices in batches to avoid API overload
+        for (const deviceId of deviceIds.slice(0, 5)) { // Limit to first 5 devices per site
+          const portsResponse = await observiumApi.get('/ports', {
+            params: {
+              device_id: deviceId,
+              fields: 'port_id,device_id,ifDescr,ifAlias,ifHighSpeed,ifInOctets_perc,ifOutOctets_perc,ifOperStatus',
+              pagesize: 20 // Limit ports per device
             }
           });
 
-          totalUtilization = portCount > 0 ? utilizationSum / portCount : 0;
+          if (portsResponse.data && portsResponse.data.ports) {
+            const ports = Object.values(portsResponse.data.ports) as any[];
+
+            ports.forEach((port: any) => {
+              if (port.ifOperStatus === 'up' && port.ifHighSpeed && parseInt(port.ifHighSpeed) > 0) {
+                portCount++;
+
+                // Use real utilization percentages from Observium
+                const inUtilization = parseFloat(port.ifInOctets_perc) || 0;
+                const outUtilization = parseFloat(port.ifOutOctets_perc) || 0;
+                const maxUtilization = Math.max(inUtilization, outUtilization);
+
+                utilizationSum += maxUtilization;
+
+                if (maxUtilization >= 80) {
+                  criticalPorts++;
+                }
+              }
+            });
+          }
         }
+
+        totalUtilization = portCount > 0 ? utilizationSum / portCount : 0;
+
+        console.log(`📊 Site ${site}: ${totalUtilization.toFixed(1)}% avg utilization, ${criticalPorts} critical ports out of ${portCount} total`);
       } catch (portError) {
         console.warn(`⚠️ Failed to fetch ports for site ${site}:`, portError);
       }
@@ -261,6 +265,7 @@ export async function GET(request: NextRequest) {
           alertCount: siteAlerts.length,
           deviceCount: siteDevices.length,
           portCount,
+          criticalPorts, // Add critical ports count
           status: getStatus(totalUtilization, siteAlerts.length, healthScore),
           issues,
           lastUpdated: new Date().toISOString(),

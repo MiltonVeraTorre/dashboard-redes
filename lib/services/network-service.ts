@@ -104,7 +104,7 @@ export async function fetchNetworkOverview(): Promise<NetworkOverview> {
 }
 
 /**
- * Fetch critical sites ranked by utilization
+ * Fetch critical sites ranked by utilization using the new API endpoint
  */
 export async function fetchCriticalSites(limit: number = 5) {
   // Check cache first
@@ -117,70 +117,101 @@ export async function fetchCriticalSites(limit: number = 5) {
   }
 
   try {
-    console.log('Fetching fresh critical sites data');
-    // Fetch data from Observium
-    const [devices, ports] = await Promise.all([
-      fetchDevices(),
-      fetchPorts()
-    ]);
+    console.log('Fetching fresh critical sites data from API');
 
-    // Map to domain entities
-    const sites = mapDevicesToSites(devices);
-    const links = mapPortsToLinks(ports);
+    // Use the new critical sites API endpoint
+    const response = await fetch(`/api/executive/critical-sites?limit=${limit}&includeDetails=false`);
 
-    // Create a map of site IDs to utilization data
-    const siteUtilization: Record<string, {
-      id: string;
-      name: string;
-      plaza: string;
-      utilizationPercentage: number;
-      criticalLinks: number;
-      totalLinks: number;
-    }> = {};
+    if (!response.ok) {
+      throw new Error(`Critical sites API error: ${response.status}`);
+    }
 
-    // Initialize with all sites
-    sites.forEach(site => {
-      siteUtilization[site.id] = {
-        id: site.id,
-        name: site.name,
-        plaza: site.plaza,
-        utilizationPercentage: 0,
-        criticalLinks: 0,
-        totalLinks: 0,
-      };
-    });
+    const apiData = await response.json();
 
-    // Calculate utilization for each site
-    links.forEach(link => {
-      const site = siteUtilization[link.siteId];
-      if (site) {
-        site.totalLinks++;
-        site.utilizationPercentage =
-          (site.utilizationPercentage * (site.totalLinks - 1) + link.utilizationPercentage) / site.totalLinks;
-
-        // Count critical links (utilization >= 80%)
-        if (link.utilizationPercentage >= 80) {
-          site.criticalLinks++;
-        }
-      }
-    });
-
-    // Convert to array and filter out sites with no links
-    const rankedSites = Object.values(siteUtilization).filter(site => site.totalLinks > 0);
-
-    // Sort by number of critical links (descending)
-    rankedSites.sort((a, b) => b.criticalLinks - a.criticalLinks);
-
-    // Get the top N sites
-    const result = rankedSites.slice(0, limit);
+    // Transform API response to match expected interface
+    const result = apiData.data.map((site: any) => ({
+      id: site.site || site.id,
+      name: site.site || site.name,
+      plaza: site.plaza,
+      utilizationPercentage: site.utilization || site.utilizationPercentage,
+      criticalLinks: site.criticalPorts || site.criticalLinks || 0,
+      totalLinks: site.portCount || site.totalLinks || 0
+    }));
 
     // Cache the result
     cacheService.set(cacheKey, result, CACHE_TTL.CRITICAL_SITES);
 
     return result;
   } catch (error) {
-    console.error('Error fetching critical sites:', error);
-    throw error;
+    console.error('Error fetching critical sites from API:', error);
+
+    // Fallback to legacy method if API fails
+    console.log('Falling back to legacy critical sites method');
+    try {
+      // Fetch data from Observium directly
+      const [devices, ports] = await Promise.all([
+        fetchDevices(),
+        fetchPorts()
+      ]);
+
+      // Map to domain entities
+      const sites = mapDevicesToSites(devices);
+      const links = mapPortsToLinks(ports);
+
+      // Create a map of site IDs to utilization data
+      const siteUtilization: Record<string, {
+        id: string;
+        name: string;
+        plaza: string;
+        utilizationPercentage: number;
+        criticalLinks: number;
+        totalLinks: number;
+      }> = {};
+
+      // Initialize with all sites
+      sites.forEach(site => {
+        siteUtilization[site.id] = {
+          id: site.id,
+          name: site.name,
+          plaza: site.plaza,
+          utilizationPercentage: 0,
+          criticalLinks: 0,
+          totalLinks: 0,
+        };
+      });
+
+      // Calculate utilization for each site
+      links.forEach(link => {
+        const site = siteUtilization[link.siteId];
+        if (site) {
+          site.totalLinks++;
+          site.utilizationPercentage =
+            (site.utilizationPercentage * (site.totalLinks - 1) + link.utilizationPercentage) / site.totalLinks;
+
+          // Count critical links (utilization >= 80%)
+          if (link.utilizationPercentage >= 80) {
+            site.criticalLinks++;
+          }
+        }
+      });
+
+      // Convert to array and filter out sites with no links
+      const rankedSites = Object.values(siteUtilization).filter(site => site.totalLinks > 0);
+
+      // Sort by number of critical links (descending)
+      rankedSites.sort((a, b) => b.criticalLinks - a.criticalLinks);
+
+      // Get the top N sites
+      const result = rankedSites.slice(0, limit);
+
+      // Cache the result
+      cacheService.set(cacheKey, result, CACHE_TTL.CRITICAL_SITES);
+
+      return result;
+    } catch (fallbackError) {
+      console.error('Fallback method also failed:', fallbackError);
+      throw fallbackError;
+    }
   }
 }
 
