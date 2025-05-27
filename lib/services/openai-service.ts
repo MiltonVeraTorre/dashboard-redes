@@ -116,6 +116,109 @@ export const OpenAIService = {
       console.error('Error generando resumen ejecutivo con OpenAI:', error);
       return "Error al generar el resumen ejecutivo. Por favor, revise los datos del dashboard técnico.";
     }
+  },
+
+  /**
+   * Genera un resumen ejecutivo basado en los datos del dashboard ejecutivo
+   */
+  generateExecutiveDashboardSummary: async (dashboardData: any): Promise<string> => {
+    // Obtener el cliente de OpenAI
+    const client = getOpenAIClient();
+    if (!client) {
+      return "OpenAI no está configurado. Por favor, configure la clave API en las variables de entorno.";
+    }
+
+    try {
+      // Extraer información clave del dashboard ejecutivo
+      const networkConsumption = dashboardData.networkConsumption || {};
+      const capacityUtilization = dashboardData.capacityUtilization || {};
+      const criticalSites = dashboardData.criticalSites || {};
+      const growthTrends = dashboardData.growthTrends || {};
+
+      // Información de consumo de red
+      const plazas = networkConsumption.plazas || [];
+      const averageConsumption = networkConsumption.summary?.averageConsumption || {};
+      const totalPlazas = plazas.length;
+
+      // Información de capacidad
+      const capacityData = capacityUtilization.data || [];
+      const capacitySummary = capacityUtilization.summary || {};
+      const averageUtilization = capacitySummary.averageUtilization || 0;
+      const totalDevices = capacitySummary.totalDevices || 0;
+      const totalPorts = capacitySummary.totalPorts || 0;
+
+      // Sitios críticos
+      const criticalSitesData = criticalSites.data || [];
+      const criticalSitesSummary = criticalSites.summary || {};
+      const totalCriticalSites = criticalSitesSummary.totalCriticalSites || 0;
+      const averageHealthScore = criticalSitesSummary.averageHealthScore || 0;
+      const totalAlerts = criticalSitesSummary.totalAlerts || 0;
+
+      // Identificar plazas con mayor utilización
+      const highUtilizationPlazas = capacityData
+        .filter(plaza => plaza.utilization > 80)
+        .map(plaza => `${plaza.plaza} (${plaza.utilization.toFixed(1)}%)`)
+        .slice(0, 3);
+
+      // Identificar sitios más críticos
+      const mostCriticalSites = criticalSitesData
+        .filter(site => site.status === 'critical')
+        .map(site => `${site.site} en ${site.plaza}`)
+        .slice(0, 3);
+
+      // Crear el contenido para OpenAI
+      const content = `
+        Genera un resumen ejecutivo conciso (máximo 4 párrafos) sobre el estado general de la red basado en estos datos del dashboard ejecutivo:
+
+        INFRAESTRUCTURA GENERAL:
+        - ${totalPlazas} plazas monitoreadas: ${plazas.join(', ')}
+        - ${totalDevices} dispositivos totales con ${totalPorts} puertos
+        - Utilización promedio de capacidad: ${averageUtilization.toFixed(1)}%
+
+        SITIOS CRÍTICOS:
+        - ${totalCriticalSites} sitios requieren atención inmediata
+        - ${totalAlerts} alertas activas en el sistema
+        - Puntuación promedio de salud: ${averageHealthScore.toFixed(1)}/100
+
+        PLAZAS CON ALTA UTILIZACIÓN:
+        ${highUtilizationPlazas.length > 0 ? highUtilizationPlazas.join(', ') : 'Ninguna plaza con utilización crítica'}
+
+        SITIOS MÁS CRÍTICOS:
+        ${mostCriticalSites.length > 0 ? mostCriticalSites.join(', ') : 'No hay sitios en estado crítico'}
+
+        CONSUMO DE RED POR PLAZA:
+        ${Object.entries(averageConsumption).map(([plaza, consumo]) =>
+          `${plaza}: ${Number(consumo).toFixed(1)}%`).join(', ')}
+
+        Incluye:
+        1. Evaluación general del estado de la infraestructura de red
+        2. Identificación de riesgos y áreas que requieren atención prioritaria
+        3. Impacto en el negocio y recomendaciones estratégicas
+        4. Próximos pasos sugeridos
+
+        Usa un tono ejecutivo, enfocado en el impacto del negocio y decisiones estratégicas.
+      `;
+
+      // Llamar a la API de OpenAI
+      const response = await client.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages: [
+          {
+            role: "system",
+            content: "Eres un consultor senior de infraestructura de red que proporciona resúmenes ejecutivos estratégicos para la alta dirección, enfocándote en el impacto del negocio y decisiones de inversión."
+          },
+          { role: "user", content }
+        ],
+        temperature: 0.3, // Baja temperatura para respuestas más consistentes
+        max_tokens: 500, // Más tokens para un resumen ejecutivo más completo
+      });
+
+      return response.choices[0]?.message?.content ||
+        "No se pudo generar el resumen ejecutivo. Por favor, revise los datos del dashboard ejecutivo.";
+    } catch (error) {
+      console.error('Error generando resumen ejecutivo del dashboard con OpenAI:', error);
+      return "Error al generar el resumen ejecutivo. Por favor, revise los datos del dashboard ejecutivo.";
+    }
   }
 };
 
