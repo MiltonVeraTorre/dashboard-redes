@@ -219,6 +219,114 @@ export const OpenAIService = {
       console.error('Error generando resumen ejecutivo del dashboard con OpenAI:', error);
       return "Error al generar el resumen ejecutivo. Por favor, revise los datos del dashboard ejecutivo.";
     }
+  },
+
+  /**
+   * Genera un resumen ejecutivo financiero basado en los datos del dashboard financiero
+   */
+  generateFinancialExecutiveSummary: async (financialData: any): Promise<string> => {
+    // Obtener el cliente de OpenAI
+    const client = getOpenAIClient();
+    if (!client) {
+      return "OpenAI no está configurado. Por favor, configure la clave API en las variables de entorno.";
+    }
+
+    try {
+      // Extraer información clave del dashboard financiero
+      const summary = financialData.summary || {};
+      const carrierAnalysis = financialData.carrierAnalysis || [];
+      const plazaBreakdown = financialData.plazaBreakdown || [];
+      const optimizationOpportunities = financialData.optimizationOpportunities || [];
+
+      // Métricas principales
+      const totalMonthlyCost = summary.totalMonthlyCost || 0;
+      const averageUtilization = summary.averageUtilization || 0;
+      const potentialSavings = summary.potentialSavings || 0;
+      const optimizableContracts = summary.optimizableContracts || 0;
+      const costPerMbps = summary.costPerMbps || 0;
+
+      // Análisis de carriers
+      const totalCarriers = carrierAnalysis.length;
+      const efficientCarriers = carrierAnalysis.filter(c => c.status === 'efficient').length;
+      const criticalCarriers = carrierAnalysis.filter(c => c.status === 'critical').length;
+      const topCarrierByCost = carrierAnalysis[0]?.carrier || 'N/A';
+      const topCarrierCost = carrierAnalysis[0]?.monthlyCost || 0;
+
+      // Análisis de plazas
+      const totalPlazas = plazaBreakdown.length;
+      const mostExpensivePlaza = plazaBreakdown[0]?.plaza || 'N/A';
+      const mostExpensivePlazaCost = plazaBreakdown[0]?.monthlyCost || 0;
+      const leastEfficientPlaza = plazaBreakdown.reduce((min, plaza) =>
+        plaza.efficiency < min.efficiency ? plaza : min, plazaBreakdown[0] || { plaza: 'N/A', efficiency: 100 });
+
+      // Oportunidades de optimización
+      const highPriorityOpportunities = optimizationOpportunities.filter(opp => opp.priority === 'high').length;
+      const cancellationOpportunities = optimizationOpportunities.filter(opp => opp.type === 'cancellation').length;
+      const renegotiationOpportunities = optimizationOpportunities.filter(opp => opp.type === 'renegotiation').length;
+
+      // Top 3 oportunidades por ahorro
+      const topOpportunities = optimizationOpportunities
+        .slice(0, 3)
+        .map(opp => `${opp.carrier} en ${opp.plaza} (${opp.type === 'cancellation' ? 'cancelación' : 'renegociación'}: $${opp.potentialSaving.toLocaleString()}/mes)`)
+        .join(', ');
+
+      // Crear el contenido para OpenAI
+      const content = `
+        Genera un resumen ejecutivo financiero conciso (máximo 4 párrafos) para XCIEN sobre la optimización de contratos de carriers basado en estos datos:
+
+        RESUMEN FINANCIERO GENERAL:
+        - Gasto total mensual: $${totalMonthlyCost.toLocaleString()} USD
+        - Eficiencia promedio de utilización: ${averageUtilization.toFixed(1)}%
+        - Ahorro potencial identificado: $${potentialSavings.toLocaleString()} USD/mes
+        - Contratos optimizables: ${optimizableContracts} de ${totalCarriers} carriers
+        - Costo promedio por Mbps utilizado: $${costPerMbps.toFixed(2)} USD
+
+        ANÁLISIS POR CARRIER:
+        - ${totalCarriers} carriers activos (${efficientCarriers} eficientes, ${criticalCarriers} críticos)
+        - Carrier con mayor gasto: ${topCarrierByCost} ($${topCarrierCost.toLocaleString()}/mes)
+        - Carriers eficientes (>70% utilización): ${efficientCarriers}
+        - Carriers críticos (<30% utilización): ${criticalCarriers}
+
+        ANÁLISIS POR PLAZA:
+        - ${totalPlazas} plazas monitoreadas
+        - Plaza con mayor gasto: ${mostExpensivePlaza} ($${mostExpensivePlazaCost.toLocaleString()}/mes)
+        - Plaza menos eficiente: ${leastEfficientPlaza.plaza} (${leastEfficientPlaza.efficiency.toFixed(1)}% eficiencia)
+
+        OPORTUNIDADES DE OPTIMIZACIÓN:
+        - ${highPriorityOpportunities} oportunidades de alta prioridad
+        - ${cancellationOpportunities} contratos candidatos a cancelación (0% uso)
+        - ${renegotiationOpportunities} contratos para renegociación (<30% uso)
+        - Top 3 oportunidades: ${topOpportunities || 'No hay oportunidades identificadas'}
+
+        Incluye:
+        1. Evaluación del estado financiero actual de los contratos de carriers
+        2. Identificación de las mayores oportunidades de ahorro y su impacto
+        3. Recomendaciones estratégicas priorizadas por ROI
+        4. Próximos pasos para implementar optimizaciones
+
+        Usa un tono ejecutivo enfocado en el impacto financiero, ROI y decisiones de negocio. Menciona cifras específicas y plazos recomendados.
+      `;
+
+      // Llamar a la API de OpenAI con modelo o3 (como prefiere el usuario)
+      const response = await client.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'o3-mini', // Usar o3 como prefiere el usuario
+        messages: [
+          {
+            role: "system",
+            content: "Eres un consultor financiero senior especializado en optimización de costos de telecomunicaciones que proporciona análisis ejecutivos estratégicos para la alta dirección, enfocándote en ROI, ahorro de costos y decisiones de inversión."
+          },
+          { role: "user", content }
+        ],
+        temperature: 0.3, // Baja temperatura para respuestas más consistentes
+        max_tokens: 600, // Más tokens para un análisis financiero completo
+      });
+
+      return response.choices[0]?.message?.content ||
+        "No se pudo generar el resumen ejecutivo financiero. Por favor, revise los datos del dashboard financiero.";
+    } catch (error) {
+      console.error('Error generando resumen ejecutivo financiero con OpenAI:', error);
+      return "Error al generar el resumen ejecutivo financiero. Por favor, revise los datos del dashboard financiero.";
+    }
   }
 };
 
