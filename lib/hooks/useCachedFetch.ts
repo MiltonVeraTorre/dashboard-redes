@@ -11,6 +11,7 @@ interface UseCachedFetchOptions {
   ttl?: number; // Time to live in milliseconds
   refreshInterval?: number; // Auto-refresh interval in milliseconds
   enabled?: boolean; // Whether to fetch data
+  fallbackUrl?: string; // Fallback URL if primary fails
   onSuccess?: (data: any) => void;
   onError?: (error: Error) => void;
 }
@@ -36,6 +37,7 @@ export function useCachedFetch<T>(
     ttl = 2 * 60 * 1000, // 2 minutes default
     refreshInterval,
     enabled = true,
+    fallbackUrl,
     onSuccess,
     onError
   } = options;
@@ -140,6 +142,32 @@ export function useCachedFetch<T>(
 
       if (onSuccessRef.current) onSuccessRef.current(result);
     } catch (err) {
+      // Try fallback URL if primary fails
+      if (fallbackUrl) {
+        try {
+          console.log(`⚠️ Primary URL failed, trying fallback: ${fallbackUrl}`);
+          const fallbackResponse = await fetch(fallbackUrl);
+          if (!fallbackResponse.ok) {
+            throw new Error(`Fallback error ${fallbackResponse.status}: ${fallbackResponse.statusText}`);
+          }
+
+          const fallbackResult = await fallbackResponse.json();
+
+          // Cache the fallback data with a shorter TTL
+          setCachedData(cacheKey, fallbackResult);
+
+          setData(fallbackResult);
+          setLastUpdated(new Date());
+          setCacheTimeRemaining(ttl);
+
+          console.log(`✅ Fallback data loaded successfully`);
+          if (onSuccessRef.current) onSuccessRef.current(fallbackResult);
+          return;
+        } catch (fallbackErr) {
+          console.error(`❌ Fallback also failed:`, fallbackErr);
+        }
+      }
+
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       setError(errorMessage);
       if (onErrorRef.current) onErrorRef.current(err instanceof Error ? err : new Error(errorMessage));
