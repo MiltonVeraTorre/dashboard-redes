@@ -91,19 +91,31 @@ export function useCachedFetch<T>(
     return remaining > 0 ? remaining : 0;
   }, []);
 
+  // Memoize callbacks to prevent infinite re-renders
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
   // Fetch data function
   const fetchData = useCallback(async (showLoading = true) => {
     if (!enabled || !url) return;
 
     const cacheKey = url;
-    
+
     // Check cache first
     const cachedData = getCachedData(cacheKey);
     if (cachedData) {
       setData(cachedData);
       setIsCached(true);
       setCacheTimeRemaining(getCacheTimeRemaining(cacheKey));
-      if (onSuccess) onSuccess(cachedData);
+      if (onSuccessRef.current) onSuccessRef.current(cachedData);
       return;
     }
 
@@ -118,23 +130,23 @@ export function useCachedFetch<T>(
       }
 
       const result = await response.json();
-      
+
       // Cache the data
       setCachedData(cacheKey, result);
-      
+
       setData(result);
       setLastUpdated(new Date());
       setCacheTimeRemaining(ttl);
-      
-      if (onSuccess) onSuccess(result);
+
+      if (onSuccessRef.current) onSuccessRef.current(result);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
       setError(errorMessage);
-      if (onError) onError(err instanceof Error ? err : new Error(errorMessage));
+      if (onErrorRef.current) onErrorRef.current(err instanceof Error ? err : new Error(errorMessage));
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, [url, enabled, getCachedData, setCachedData, getCacheTimeRemaining, ttl, onSuccess, onError]);
+  }, [url, enabled, getCachedData, setCachedData, getCacheTimeRemaining, ttl]);
 
   // Update cache time remaining periodically
   useEffect(() => {

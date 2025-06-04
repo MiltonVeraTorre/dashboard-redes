@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NetworkConsumptionChart } from '@/app/_components/NetworkConsumptionChart';
 import { CapacityUtilizationChart } from '@/app/_components/CapacityUtilizationChart';
 import { CriticalSitesPanel } from '@/app/_components/CriticalSitesPanel';
@@ -22,7 +22,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
 
   // Función para recopilar datos de todos los componentes del dashboard
-  const collectDashboardData = async () => {
+  const collectDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -66,11 +66,11 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     collectDashboardData();
-  }, []);
+  }, [collectDashboardData]);
 
   return (
     <div className="min-h-screen bg-gray-50">

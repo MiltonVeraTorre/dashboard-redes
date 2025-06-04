@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface CapacityData {
@@ -46,11 +46,7 @@ export function CapacityUtilizationChart({ height = 300, includeDetails = false 
   const [dataSource, setDataSource] = useState<string>('');
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  useEffect(() => {
-    fetchCapacityUtilization();
-  }, [includeDetails]);
-
-  const fetchCapacityUtilization = async () => {
+  const fetchCapacityUtilization = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -76,7 +72,11 @@ export function CapacityUtilizationChart({ height = 300, includeDetails = false 
     } finally {
       setLoading(false);
     }
-  };
+  }, [includeDetails]);
+
+  useEffect(() => {
+    fetchCapacityUtilization();
+  }, [fetchCapacityUtilization]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {

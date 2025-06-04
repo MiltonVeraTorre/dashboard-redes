@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface NetworkConsumptionData {
@@ -45,11 +45,7 @@ export function NetworkConsumptionChart({ timeRange = '7d', height = 300 }: Netw
   const [isDemo, setIsDemo] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  useEffect(() => {
-    fetchNetworkConsumption();
-  }, [timeRange]);
-
-  const fetchNetworkConsumption = async () => {
+  const fetchNetworkConsumption = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -79,7 +75,11 @@ export function NetworkConsumptionChart({ timeRange = '7d', height = 300 }: Netw
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
+
+  useEffect(() => {
+    fetchNetworkConsumption();
+  }, [fetchNetworkConsumption]);
 
   const formatTimestamp = (timestamp: string, range: string): string => {
     const date = new Date(timestamp);

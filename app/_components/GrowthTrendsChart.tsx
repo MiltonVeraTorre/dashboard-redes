@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface GrowthDataPoint {
@@ -67,11 +67,7 @@ export function GrowthTrendsChart({
   const [isDemo, setIsDemo] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  useEffect(() => {
-    fetchGrowthTrends();
-  }, [timeRange, metric]);
-
-  const fetchGrowthTrends = async () => {
+  const fetchGrowthTrends = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -98,7 +94,11 @@ export function GrowthTrendsChart({
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange, metric]);
+
+  useEffect(() => {
+    fetchGrowthTrends();
+  }, [fetchGrowthTrends]);
 
   const formatPeriod = (period: string): string => {
     if (period.includes('W')) {

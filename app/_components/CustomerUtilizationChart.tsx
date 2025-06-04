@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -65,9 +65,11 @@ export default function CustomerUtilizationChart() {
     }
   };
 
+  const fetchDataCallback = useCallback(fetchData, [threshold, sortBy]);
+
   useEffect(() => {
-    fetchData();
-  }, [threshold, sortBy]);
+    fetchDataCallback();
+  }, [fetchDataCallback]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
