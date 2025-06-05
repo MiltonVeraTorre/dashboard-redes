@@ -1,8 +1,8 @@
 // API endpoint DEMO para funcionalidades operativas XCIEN
-// Usa datos simulados para demostrar las funcionalidades implementadas
+// Usa datos realistas de XCIEN para demostrar las funcionalidades implementadas
 
 import { NextRequest, NextResponse } from 'next/server';
-import { 
+import {
   XCIENOperationalDashboard,
   XCIENLinkInventory,
   BiweeklyMetrics,
@@ -13,6 +13,17 @@ import {
   AutomatedAlert,
   HistoricalTrend
 } from '@/lib/types/xcien-operational';
+import {
+  transformToLinkInventory,
+  transformToBiweeklyMetrics,
+  transformToRadioBaseAnalysis,
+  transformToCityTierClassification,
+  transformToEngineeringThresholds,
+  transformToCostAnalysis,
+  transformToAutomatedAlerts,
+  generateBiweeklyPeriods,
+  formatPeriodLabel as formatXCIENPeriodLabel
+} from '@/lib/mocks/xcien-datasets';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -21,15 +32,15 @@ export async function GET(request: NextRequest) {
   console.log(`🏢 Generating XCIEN operational DEMO data for period: ${period}`);
   
   try {
-    // Generar datos de demostración
-    const linkInventory = generateDemoLinkInventory();
-    const biweeklyMetrics = generateDemoBiweeklyMetrics(linkInventory, period);
-    const radioBaseAnalysis = generateDemoRadioBaseAnalysis();
-    const cityTierClassification = generateDemoCityTierClassification();
-    const engineeringThresholds = generateDemoEngineeringThresholds(linkInventory, biweeklyMetrics);
-    const costAnalysis = generateDemoCostAnalysis(linkInventory);
-    const historicalTrends = generateDemoHistoricalTrends(linkInventory);
-    const activeAlerts = generateDemoAlerts(engineeringThresholds, costAnalysis, linkInventory);
+    // Generar datos de demostración usando datasets reales de XCIEN
+    const linkInventory = transformToLinkInventory();
+    const biweeklyMetrics = transformToBiweeklyMetrics(period);
+    const radioBaseAnalysis = transformToRadioBaseAnalysis();
+    const cityTierClassification = transformToCityTierClassification();
+    const engineeringThresholds = transformToEngineeringThresholds();
+    const costAnalysis = transformToCostAnalysis();
+    const historicalTrends = generateDemoHistoricalTrends(linkInventory); // Keep existing for now
+    const activeAlerts = transformToAutomatedAlerts();
     
     const operationalData: XCIENOperationalDashboard = {
       linkInventory,

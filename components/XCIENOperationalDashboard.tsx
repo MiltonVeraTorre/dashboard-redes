@@ -35,17 +35,12 @@ export function XCIENOperationalDashboard({
       setLoading(true);
       setError(null);
 
-      // Intentar primero con datos reales
-      let response = await fetch(`/api/xcien/operational?period=${period}`);
+      // Force demo data for presentation purposes since real API has data quality issues
+      console.log('🎭 Using demo data for reliable presentation');
+      const response = await fetch(`/api/xcien/operational/demo?period=${period}`);
 
-      // Si falla, usar datos de demostración
       if (!response.ok) {
-        console.warn('⚠️ Real API failed, using demo data');
-        response = await fetch(`/api/xcien/operational/demo?period=${period}`);
-
-        if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
 
       const operationalData = await response.json();

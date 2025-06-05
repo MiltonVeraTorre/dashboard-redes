@@ -36,9 +36,16 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const period = searchParams.get('period') || 'current';
   const includeHistorical = searchParams.get('historical') === 'true';
-  
+  const forceDemo = searchParams.get('demo') === 'true';
+
   console.log(`🏢 Fetching XCIEN operational data for period: ${period}`);
-  
+
+  // Force demo data if requested or if real data is insufficient
+  if (forceDemo) {
+    console.log('🎭 Using demo data as requested');
+    return await fetchDemoData(period);
+  }
+
   try {
     // Obtener datos base de Observium
     const [portsData, devicesData, billsData] = await Promise.all([
@@ -46,13 +53,31 @@ export async function GET(request: NextRequest) {
       fetchObserviumDevices(),
       fetchObserviumBills()
     ]);
-    
+
     console.log(`📊 Retrieved data: ${portsData.length} ports, ${devicesData.length} devices, ${billsData.length} bills`);
-    
+
+    // Check if we have sufficient data quality
+    if (portsData.length < 5 || devicesData.length < 3) {
+      console.warn('⚠️ Insufficient real data, falling back to demo data');
+      return await fetchDemoData(period);
+    }
+
     // Procesar inventario de enlaces
     const linkInventory = processLinkInventory(portsData, devicesData);
     console.log(`🔗 Processed ${linkInventory.length} links in inventory`);
-    
+
+    // Check for data quality issues (UNKNOWN values)
+    const hasUnknownValues = linkInventory.some(link =>
+      link.plaza === 'UNKNOWN' ||
+      link.carrierProvider === 'UNKNOWN' ||
+      link.radioBase === 'UNKNOWN'
+    );
+
+    if (hasUnknownValues || linkInventory.length < 3) {
+      console.warn('⚠️ Data quality issues detected, falling back to demo data');
+      return await fetchDemoData(period);
+    }
+
     // Procesar métricas quincenales
     const biweeklyMetrics = processBiweeklyMetrics(linkInventory, billsData, period);
     console.log(`📈 Processed biweekly metrics for ${biweeklyMetrics.length} links`);
@@ -62,23 +87,23 @@ export async function GET(request: NextRequest) {
       biweeklyStorage.savePeriodData(period, biweeklyMetrics);
       console.log(`💾 Saved historical data for period ${period}`);
     }
-    
+
     // Procesar análisis por radio-base
     const radioBaseAnalysis = processRadioBaseAnalysis(linkInventory);
     console.log(`📡 Analyzed ${radioBaseAnalysis.length} radio bases`);
-    
+
     // Procesar clasificación de ciudades
     const cityTierClassification = processCityTierClassification(linkInventory, radioBaseAnalysis);
     console.log(`🏙️ Classified ${cityTierClassification.length} cities`);
-    
+
     // Procesar umbrales de ingeniería
     const engineeringThresholds = processEngineeringThresholds(linkInventory, biweeklyMetrics);
     console.log(`⚠️ Processed ${engineeringThresholds.length} engineering thresholds`);
-    
+
     // Procesar análisis de costos
     const costAnalysis = processCostAnalysis(linkInventory, billsData);
     console.log(`💰 Analyzed costs for ${costAnalysis.length} links`);
-    
+
     // Generar alertas automáticas
     const activeAlerts = generateAutomatedAlerts(engineeringThresholds, costAnalysis, linkInventory);
     console.log(`🚨 Generated ${activeAlerts.length} automated alerts`);
@@ -87,7 +112,7 @@ export async function GET(request: NextRequest) {
     const linkIds = linkInventory.map(link => link.linkId);
     const historicalTrends = biweeklyStorage.generateHistoricalTrends(linkIds);
     console.log(`📊 Generated historical trends for ${historicalTrends.length} links`);
-    
+
     // Construir respuesta operativa
     const operationalData: XCIENOperationalDashboard = {
       linkInventory,
@@ -101,15 +126,31 @@ export async function GET(request: NextRequest) {
       lastUpdated: new Date().toISOString(),
       dataQuality: calculateDataQuality(linkInventory, biweeklyMetrics, billsData)
     };
-    
+
     console.log(`✅ Successfully generated XCIEN operational dashboard`);
-    
+
     return NextResponse.json(operationalData);
-    
+
   } catch (error) {
     console.error('❌ Error generating XCIEN operational data:', error);
+    console.log('🎭 Falling back to demo data due to error');
+    return await fetchDemoData(period);
+  }
+}
+
+// Helper function to fetch demo data
+async function fetchDemoData(period: string) {
+  try {
+    const demoResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/xcien/operational/demo?period=${period}`);
+    if (!demoResponse.ok) {
+      throw new Error('Demo data fetch failed');
+    }
+    const demoData = await demoResponse.json();
+    return NextResponse.json(demoData);
+  } catch (error) {
+    console.error('❌ Error fetching demo data:', error);
     return NextResponse.json(
-      { error: 'Failed to generate operational data', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to generate operational data', details: 'Both real and demo data failed' },
       { status: 500 }
     );
   }

@@ -1,45 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  networkLinkUtilizationData,
+  cityRevenueInfrastructureData,
+  generateXCIENLinkInventory,
+  generateXCIENBiweeklyMetrics,
+  generateXCIENCostAnalysis,
+  generateXCIENPlazaBreakdown,
+  generateXCIENCarrierAnalysis,
+  generateXCIENOptimizationOpportunities
+} from '@/lib/mocks/xcien-datasets';
 
 /**
  * GET /api/financial/demo
- * 
- * Returns demo financial data for the XCIEN financial dashboard when real API is not available.
- * This endpoint provides realistic sample data for development and testing purposes.
- * 
+ *
+ * Returns XCIEN-specific demo financial data when real API is not available.
+ * Uses realistic XCIEN datasets with actual plaza names, carriers, and network topology.
+ *
  * Query Parameters:
  * - period: Analysis period (default: '1m') - '1d', '3d', '1w', '1m', '3m', '6m', '1y'
- * 
- * Response: Same structure as /api/financial/overview but with demo data
+ *
+ * Response: Same structure as /api/financial/overview but with XCIEN demo data
  */
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const period = searchParams.get('period') || '1m';
-    
-    console.log(`🎭 Generating demo financial data for period: ${period}`);
-    
-    const demoData = generateDemoFinancialData(period);
-    
-    console.log(`✅ Generated demo financial data: $${demoData.summary.totalMonthlyCost.toLocaleString()}`);
-    
+
+    console.log(`🏢 Generating XCIEN-specific demo financial data for period: ${period}`);
+
+    const demoData = generateXCIENFinancialData(period);
+
+    console.log(`✅ Generated XCIEN demo financial data: $${demoData.summary.totalMonthlyCost.toLocaleString()}`);
+    console.log(`📊 XCIEN data: ${demoData.carrierAnalysis.length} carriers, ${demoData.plazaBreakdown.length} plazas`);
+
     return NextResponse.json({
       ...demoData,
       timestamp: new Date().toISOString(),
-      source: 'demo_data'
+      source: 'xcien_demo_data'
     });
-    
+
   } catch (error) {
-    console.error('❌ Error generating demo financial data:', error);
+    console.error('❌ Error generating XCIEN demo financial data:', error);
     return NextResponse.json(
-      { error: 'Failed to generate demo data', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to generate XCIEN demo data', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
 }
 
-// Generate demo financial data
-function generateDemoFinancialData(period: string = '1m') {
+// Generate XCIEN-specific demo financial data using realistic datasets
+function generateXCIENFinancialData(period: string = '1m') {
+  console.log(`🏢 Generating XCIEN financial data using realistic datasets for period: ${period}`);
+
   // Apply period-based multipliers for cost calculations
   const periodMultipliers = {
     '1d': { cost: 0.033, label: 'diario' },
@@ -52,156 +65,42 @@ function generateDemoFinancialData(period: string = '1m') {
   };
 
   const multiplier = periodMultipliers[period as keyof typeof periodMultipliers] || periodMultipliers['1m'];
-  
-  // Demo carrier analysis with realistic XCIEN data - matching expected interface
-  const carrierAnalysis = [
-    {
-      carrier: 'Neutral Networks',
-      monthlyCost: Math.round(45000 * multiplier.cost),
-      contractedMbps: 10,
-      utilizedMbps: 7.2,
-      utilizationPercentage: 72.0,
-      costPerMbps: 37.5,
-      status: 'efficient' as const,
-      potentialSaving: 0
-    },
-    {
-      carrier: 'Cogent',
-      monthlyCost: Math.round(32000 * multiplier.cost),
-      contractedMbps: 8,
-      utilizedMbps: 5.44,
-      utilizationPercentage: 68.0,
-      costPerMbps: 40.0,
-      status: 'efficient' as const,
-      potentialSaving: 0
-    },
-    {
-      carrier: 'TI-Sparkle',
-      monthlyCost: Math.round(28000 * multiplier.cost),
-      contractedMbps: 6,
-      utilizedMbps: 3.9,
-      utilizationPercentage: 65.0,
-      costPerMbps: 46.7,
-      status: 'attention' as const,
-      potentialSaving: Math.round(3200 * multiplier.cost)
-    },
-    {
-      carrier: 'F16',
-      monthlyCost: Math.round(20000 * multiplier.cost),
-      contractedMbps: 4,
-      utilizedMbps: 2.32,
-      utilizationPercentage: 58.0,
-      costPerMbps: 50.0,
-      status: 'critical' as const,
-      potentialSaving: Math.round(2400 * multiplier.cost)
-    }
-  ];
 
-  // Demo plaza breakdown - matching expected interface
-  const plazaBreakdown = [
-    {
-      plaza: 'Monterrey',
-      monthlyCost: Math.round(52000 * multiplier.cost),
-      carriers: 2,
-      totalMbps: 14,
-      utilizedMbps: 10.5,
-      efficiency: 75.0,
-      optimizationOpportunities: 0
-    },
-    {
-      plaza: 'Guadalajara',
-      monthlyCost: Math.round(38000 * multiplier.cost),
-      carriers: 2,
-      totalMbps: 10,
-      utilizedMbps: 6.8,
-      efficiency: 68.0,
-      optimizationOpportunities: 1
-    },
-    {
-      plaza: 'CDMX',
-      monthlyCost: Math.round(25000 * multiplier.cost),
-      carriers: 1,
-      totalMbps: 6,
-      utilizedMbps: 3.72,
-      efficiency: 62.0,
-      optimizationOpportunities: 0
-    },
-    {
-      plaza: 'Querétaro',
-      monthlyCost: Math.round(18000 * multiplier.cost),
-      carriers: 1,
-      totalMbps: 4,
-      utilizedMbps: 2.2,
-      efficiency: 55.0,
-      optimizationOpportunities: 1
-    },
-    {
-      plaza: 'Tijuana',
-      monthlyCost: Math.round(12000 * multiplier.cost),
-      carriers: 1,
-      totalMbps: 2,
-      utilizedMbps: 0.96,
-      efficiency: 48.0,
-      optimizationOpportunities: 1
-    }
-  ];
+  // Generate XCIEN-specific data using the realistic datasets
+  const linkInventory = generateXCIENLinkInventory();
+  const biweeklyMetrics = generateXCIENBiweeklyMetrics(linkInventory, period);
+  const costAnalysis = generateXCIENCostAnalysis(linkInventory, biweeklyMetrics);
 
-  // Demo optimization opportunities - matching expected interface
-  const optimizationOpportunities = [
-    {
-      id: 'opp-1',
-      type: 'renegotiation' as const,
-      carrier: 'TI-Sparkle',
-      plaza: 'Tijuana',
-      description: 'TI-Sparkle tiene un costo por Mbps de $46.7, superior al benchmark de $38',
-      currentCost: Math.round(28000 * multiplier.cost),
-      potentialSaving: Math.round(3200 * multiplier.cost),
-      priority: 'high' as const,
-      utilizationRate: 65
-    },
-    {
-      id: 'opp-2',
-      type: 'cancellation' as const,
-      carrier: 'F16',
-      plaza: 'Guadalajara',
-      description: 'F16 tiene baja utilización (58%) y alto costo por Mbps',
-      currentCost: Math.round(20000 * multiplier.cost),
-      potentialSaving: Math.round(2400 * multiplier.cost),
-      priority: 'medium' as const,
-      utilizationRate: 58
-    },
-    {
-      id: 'opp-3',
-      type: 'upgrade' as const,
-      carrier: 'Neutral Networks',
-      plaza: 'Monterrey',
-      description: 'Monterrey está al 75% de utilización, considerar upgrade',
-      currentCost: Math.round(45000 * multiplier.cost),
-      potentialSaving: 0, // No saving, but prevents future issues
-      priority: 'low' as const,
-      utilizationRate: 75
-    }
-  ];
+  // Generate XCIEN carrier analysis using realistic data
+  const carrierAnalysis = generateXCIENCarrierAnalysis(linkInventory, biweeklyMetrics, costAnalysis, multiplier);
 
-  // Calculate summary metrics - matching expected interface
+  // Generate XCIEN plaza breakdown using realistic data
+  const plazaBreakdown = generateXCIENPlazaBreakdown(linkInventory, biweeklyMetrics, costAnalysis, multiplier);
+
+  // Generate XCIEN optimization opportunities using realistic data
+  const optimizationOpportunities = generateXCIENOptimizationOpportunities(carrierAnalysis, plazaBreakdown, multiplier);
+
+  // Calculate summary metrics using XCIEN data
   const totalMonthlyCost = carrierAnalysis.reduce((sum, carrier) => sum + carrier.monthlyCost, 0);
   const totalCapacity = carrierAnalysis.reduce((sum, carrier) => sum + carrier.contractedMbps, 0);
   const totalUtilized = carrierAnalysis.reduce((sum, carrier) => sum + carrier.utilizedMbps, 0);
-  const weightedUtilization = (totalUtilized / totalCapacity) * 100;
-  const averageCostPerMbps = totalMonthlyCost / totalCapacity;
+  const weightedUtilization = totalCapacity > 0 ? (totalUtilized / totalCapacity) * 100 : 0;
+  const averageCostPerMbps = totalCapacity > 0 ? totalMonthlyCost / totalCapacity : 0;
 
   const summary = {
     totalMonthlyCost,
-    averageUtilization: weightedUtilization,
+    averageUtilization: Math.round(weightedUtilization * 10) / 10,
     potentialSavings: optimizationOpportunities
       .filter(opp => opp.potentialSaving > 0)
       .reduce((sum, opp) => sum + opp.potentialSaving, 0),
     optimizableContracts: optimizationOpportunities.length,
-    costPerMbps: averageCostPerMbps,
+    costPerMbps: Math.round(averageCostPerMbps * 100) / 100,
     currency: 'USD',
     period: period,
     periodLabel: multiplier.label
   };
+
+  console.log(`✅ Generated XCIEN financial summary: $${totalMonthlyCost.toLocaleString()}, ${carrierAnalysis.length} carriers, ${plazaBreakdown.length} plazas`);
 
   return {
     summary,

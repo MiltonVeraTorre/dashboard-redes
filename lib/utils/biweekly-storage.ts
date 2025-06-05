@@ -16,6 +16,15 @@ class BiweeklyStorageManager {
 
   // Obtener todos los datos históricos
   getAllData(): BiweeklyStorageData {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return {
+        periods: [],
+        metrics: {},
+        lastUpdated: new Date().toISOString()
+      };
+    }
+
     try {
       const stored = localStorage.getItem(this.storageKey);
       if (stored) {
@@ -34,14 +43,20 @@ class BiweeklyStorageManager {
 
   // Guardar datos de un período
   savePeriodData(period: string, metrics: BiweeklyMetrics[]): void {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      console.warn('localStorage not available, skipping save');
+      return;
+    }
+
     try {
       const data = this.getAllData();
-      
+
       // Agregar período si no existe
       if (!data.periods.includes(period)) {
         data.periods.push(period);
         data.periods.sort(); // Mantener orden cronológico
-        
+
         // Limitar número de períodos
         if (data.periods.length > this.maxPeriods) {
           const oldPeriod = data.periods.shift();
@@ -50,14 +65,14 @@ class BiweeklyStorageManager {
           }
         }
       }
-      
+
       // Guardar métricas del período
       data.metrics[period] = metrics;
       data.lastUpdated = new Date().toISOString();
-      
+
       localStorage.setItem(this.storageKey, JSON.stringify(data));
       console.log(`✅ Saved biweekly data for period ${period}: ${metrics.length} metrics`);
-      
+
     } catch (error) {
       console.error('Error saving biweekly data:', error);
     }
@@ -199,6 +214,12 @@ class BiweeklyStorageManager {
 
   // Limpiar datos antiguos
   clearOldData(): void {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      console.warn('localStorage not available, skipping clear');
+      return;
+    }
+
     try {
       localStorage.removeItem(this.storageKey);
       console.log('✅ Cleared old biweekly data');
@@ -215,18 +236,24 @@ class BiweeklyStorageManager {
 
   // Importar datos desde backup
   importData(jsonData: string): boolean {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      console.warn('localStorage not available, skipping import');
+      return false;
+    }
+
     try {
       const data = JSON.parse(jsonData);
-      
+
       // Validar estructura básica
       if (!data.periods || !data.metrics || !Array.isArray(data.periods)) {
         throw new Error('Invalid data structure');
       }
-      
+
       localStorage.setItem(this.storageKey, jsonData);
       console.log('✅ Imported biweekly data successfully');
       return true;
-      
+
     } catch (error) {
       console.error('Error importing biweekly data:', error);
       return false;
@@ -307,6 +334,21 @@ export function formatPeriodLabel(period: string): string {
 
 // Hook para usar el almacenamiento en componentes React
 export function useBiweeklyStorage() {
+  // Check if we're in a browser environment before using React hooks
+  if (typeof window === 'undefined') {
+    return {
+      data: null,
+      loading: false,
+      savePeriodData: () => {},
+      getLinkHistory: () => [],
+      generateTrends: () => [],
+      getStats: () => ({ totalPeriods: 0, totalMetrics: 0, oldestPeriod: null, newestPeriod: null, storageSize: 0 })
+    };
+  }
+
+  // Import React dynamically to avoid SSR issues
+  const React = require('react');
+
   const [data, setData] = React.useState<BiweeklyStorageData | null>(null);
   const [loading, setLoading] = React.useState(true);
 

@@ -229,13 +229,17 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('❌ Error fetching financial overview data:', error);
 
-    // Return demo data on error
-    console.log('🔄 Returning demo data due to error');
+    // Return XCIEN demo data on error
+    console.log('🔄 Returning XCIEN demo data due to API error');
+
+    // Import XCIEN demo data generation function
+    const { generateXCIENFinancialData } = await import('@/lib/mocks/xcien-datasets');
+
     return NextResponse.json({
-      ...generateDemoFinancialData(request.nextUrl.searchParams.get('period') || '1m'),
-      error: 'Using demo data due to API error',
+      ...generateXCIENFinancialData(request.nextUrl.searchParams.get('period') || '1m'),
+      error: 'Using XCIEN demo data due to API error',
       timestamp: new Date().toISOString(),
-      source: 'demo_data'
+      source: 'xcien_demo_fallback'
     });
   }
 }
